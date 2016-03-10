@@ -47,26 +47,26 @@ void IM_model(IM_Typedef *IM_Struct,float Valpha,float Vbeta,float TL,float *Ial
 
     // parameters for current and flux dynamics
 
-    A = 0;
-    B = 0;
-    Ialpha_cur = 0;
-    Ialpha_pre = 0;
-    Ibeta_cur = 0;
-    Ibeta_pre = 0;
-    Valpha_cur = 0;
-    Vbeta_cur = 0;
-    psi_alpha_cur = 0;
-    psi_alpha_pre = 0;
-    psi_beta_cur = 0;
-    psi_beta_pre = 0;
+    float A = 0;
+    float B = 0;
+    float Ialpha_cur = 0;
+    float Ialpha_pre = 0;
+    float Ibeta_cur = 0;
+    float Ibeta_pre = 0;
+    float Valpha_cur = 0;
+    float Vbeta_cur = 0;
+    float psi_alpha_cur = 0;
+    float psi_alpha_pre = 0;
+    float psi_beta_cur = 0;
+    float psi_beta_pre = 0;
 
     // parameters for torque and mechanical dynamics
 
-    C = 0;
-    Te_cur = 0;
-    TL_cur = 0
-    Wr_cur = 0;
-    Wr_pre = 0;
+    float C = 0;
+    float Te_cur = 0;
+    float TL_cur = 0;
+    float Wr_cur = 0;
+    float Wr_pre = 0;
 
 
     // Computation
@@ -88,9 +88,9 @@ void IM_model(IM_Typedef *IM_Struct,float Valpha,float Vbeta,float TL,float *Ial
 
     A = 1 + (IM_Struct->Ts/L_sigma)*(R_S + R_R);
 
-    Ialpha_cur = (1/A)*(Ialpha_pre + (IM_Struct->Ts/float L_sigma)*Valpha_cur + ((IM_Struct->Ts*R_R)/(L_sigma*L_M))*psi_beta_pre + (IM_Struct->Ts*Wr_pre/L_sigma)*psi_beta_pre);
+    Ialpha_cur = (1/A)*(Ialpha_pre + (IM_Struct->Ts/L_sigma)*Valpha_cur + ((IM_Struct->Ts*R_R)/(L_sigma*L_M))*psi_beta_pre + (IM_Struct->Ts*Wr_pre/L_sigma)*psi_beta_pre);
 
-    Ibeta_cur = (1/A)*(Ibeta_pre + (IM_Struct->Ts/float L_sigma)*Vbeta_cur + ((IM_Struct->Ts*R_R)/(L_sigma*L_M))*psi_alpha_pre - (IM_Struct->Ts*Wr_pre/L_sigma)*psi_alpha_pre);
+    Ibeta_cur = (1/A)*(Ibeta_pre + (IM_Struct->Ts/L_sigma)*Vbeta_cur + ((IM_Struct->Ts*R_R)/(L_sigma*L_M))*psi_alpha_pre - (IM_Struct->Ts*Wr_pre/L_sigma)*psi_alpha_pre);
 
     // Flux dynamics for inverse T-equivalent circuit for the induction motor
 
