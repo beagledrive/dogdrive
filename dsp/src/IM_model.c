@@ -1,26 +1,35 @@
+/* Beaglebone Open-Source Machine Drive
+ * Induction motor model used to test control algorithm
+ * KTH Project Work - 2018 
+ */
+
+
+/* ================================== INCLUDES ============================== */
+
 #include <stdio.h>
 #include <stdlib.h>
+#include <math.h>
 
-/*******  Induction Motor model  ******/
+#include <IM_model.h>
 
-typedef struct
-{
-    float Rs;                 // Stator resistance in dynamic T-equivalent circuit for the induction motor
-    float Rr;			      // Rotor resistance in dynamic T-equivalent circuit for the induction motor
-    float Ll;                 // Leakage inductance in dynamic T-equivalent circuit for the induction motor
-    float Lm;                 // Magnetizing inductance in dynamic T-equivalent circuit for the induction motor
-    float Ts;                 // Sampling time
-    float Np;                 // Number of pole pairs
-    float K;                  // Space vector scaling constant
-    float J;                  // Mechanical inertia constant
-    float b;                  // damping constant
 
-}IM_Typedef;
+/* ================================== MACROS ================================ */
 
-void IM_StructInit(IM_Typedef *IM_Struct,float Rstator,float Rrotor,float Lleak,float Lmag,float Tsamp,float Npp,float SpcVectScaling,float InrConst,float DampConst);
-void IM_model(IM_Typedef *IM_Struct,float Valpha,float Vbeta,float TL,float *Ialpha,float *Ibeta,float *Wr);
 
-void IM_StructInit(IM_Typedef *IM_Struct,float Rstator,float Rrotor,float Lleak,float Lmag,float Tsamp,float Npp,float SpcVectScaling,float InrConst,float DampConst)
+/* ================================== TYPEDEFS ============================== */
+
+
+/* ================================== FUNCTION PROTOTYPES =================== */
+
+
+/* ================================== INTERNAL GLOBALS ====================== */
+
+
+/* ================================== FUNCTION DEFINITIONS ================== */
+
+void IM_StructInit(IM_Typedef *IM_Struct,float Rstator,float Rrotor,float Lleak,
+			float Lmag,float Tsamp,float Npp,float SpcVectScaling,
+			float InrConst,float DampConst)
 {
     IM_Struct->Rs = Rstator;
     IM_Struct->Rr = Rrotor;
@@ -32,12 +41,12 @@ void IM_StructInit(IM_Typedef *IM_Struct,float Rstator,float Rrotor,float Lleak,
     IM_Struct->J = InrConst;
     IM_Struct->b = DampConst;
 }
-void IM_model(IM_Typedef *IM_Struct,float Valpha,float Vbeta,float TL,float *Ialpha,float *Ibeta,float *Wr)
+
+void IM_model(IM_Typedef *IM_Struct,float Valpha,float Vbeta,float TL,
+			float *Ia,float *Ib,float *Ic, float *Wr)
 {
-    // Declaration
 
-    // parameters for inverse T-equivalent circuit for induction motor
-
+    // Parameters for inverse T-equivalent circuit for induction motor
     float Ls = 0;
     float Lr = 0;
     float R_S = 0;
@@ -46,7 +55,6 @@ void IM_model(IM_Typedef *IM_Struct,float Valpha,float Vbeta,float TL,float *Ial
     float L_sigma = 0;
 
     // parameters for current and flux dynamics
-
     float A = 0;
     float B = 0;
     float Ialpha_cur = 0;
@@ -61,7 +69,6 @@ void IM_model(IM_Typedef *IM_Struct,float Valpha,float Vbeta,float TL,float *Ial
     float psi_beta_pre = 0;
 
     // parameters for torque and mechanical dynamics
-
     float C = 0;
     float Te_cur = 0;
     float TL_cur = 0;
@@ -70,13 +77,11 @@ void IM_model(IM_Typedef *IM_Struct,float Valpha,float Vbeta,float TL,float *Ial
 
 
     // Computation
-
     Valpha_cur = Valpha;
     Vbeta_cur = Vbeta;
     TL_cur = TL;
 
     // Parameters for inverse T-equivalent circuit for the induction motor
-
     Ls = IM_Struct->Lm + 0.5*IM_Struct->Ll;
     Lr = IM_Struct->Lm + 0.5*IM_Struct->Ll;
     R_S = IM_Struct->Rs;
@@ -85,33 +90,34 @@ void IM_model(IM_Typedef *IM_Struct,float Valpha,float Vbeta,float TL,float *Ial
     L_sigma = Ls - L_M;
 
     // Current dynamics for inverse T-equivalent circuit for the induction motor
-
     A = 1 + (IM_Struct->Ts/L_sigma)*(R_S + R_R);
 
-    Ialpha_cur = (1/A)*(Ialpha_pre + (IM_Struct->Ts/L_sigma)*Valpha_cur + ((IM_Struct->Ts*R_R)/(L_sigma*L_M))*psi_beta_pre + (IM_Struct->Ts*Wr_pre/L_sigma)*psi_beta_pre);
+    Ialpha_cur = (1/A)*(Ialpha_pre + (IM_Struct->Ts/L_sigma)*Valpha_cur 
+		    + ((IM_Struct->Ts*R_R)/(L_sigma*L_M))*psi_beta_pre 
+		    + (IM_Struct->Ts*Wr_pre/L_sigma)*psi_beta_pre);
 
-    Ibeta_cur = (1/A)*(Ibeta_pre + (IM_Struct->Ts/L_sigma)*Vbeta_cur + ((IM_Struct->Ts*R_R)/(L_sigma*L_M))*psi_alpha_pre - (IM_Struct->Ts*Wr_pre/L_sigma)*psi_alpha_pre);
+    Ibeta_cur = (1/A)*(Ibeta_pre + (IM_Struct->Ts/L_sigma)*Vbeta_cur 
+		    + ((IM_Struct->Ts*R_R)/(L_sigma*L_M))*psi_alpha_pre 
+		    - (IM_Struct->Ts*Wr_pre/L_sigma)*psi_alpha_pre);
 
     // Flux dynamics for inverse T-equivalent circuit for the induction motor
-
     B = 1 + (IM_Struct->Ts*R_R/L_M);
 
-    psi_alpha_cur = (1/B)*(psi_alpha_pre + (IM_Struct->Ts*R_R)*Ialpha_cur - (IM_Struct->Ts*Wr_pre)*psi_beta_pre);
+    psi_alpha_cur = (1/B)*(psi_alpha_pre + (IM_Struct->Ts*R_R)*Ialpha_cur 
+		    - (IM_Struct->Ts*Wr_pre)*psi_beta_pre);
 
-    psi_beta_cur = (1/B)*(psi_beta_pre + (IM_Struct->Ts*R_R)*Ibeta_cur - (IM_Struct->Ts*Wr_pre)*psi_alpha_cur);
+    psi_beta_cur = (1/B)*(psi_beta_pre + (IM_Struct->Ts*R_R)*Ibeta_cur 
+		    - (IM_Struct->Ts*Wr_pre)*psi_alpha_cur);
 
     // Developed electromagnetic torque
-
     Te_cur = ((3*IM_Struct->Np)/(2*IM_Struct->K*IM_Struct->K))*(psi_alpha_cur*Ibeta_cur - psi_beta_cur*Ialpha_cur);
 
     // Mechanical dynamics for inverse T-equivalent circuit for the induction motor
-
     C = 1 + (IM_Struct->Ts*IM_Struct->b/IM_Struct->J);
 
     Wr_cur = (1/C)*(Wr_pre +(IM_Struct->Ts/IM_Struct->J)*Te_cur -(IM_Struct->Ts/IM_Struct->J)*TL_cur);
 
     // Update state variables
-
     Ialpha_pre = Ialpha_cur;
     Ibeta_pre = Ibeta_cur;
 
@@ -121,10 +127,10 @@ void IM_model(IM_Typedef *IM_Struct,float Valpha,float Vbeta,float TL,float *Ial
     Wr_pre = Wr_cur;
 
     // Output
-
-    *Ialpha = Ialpha_cur;
-    *Ibeta = Ibeta_cur;
     *Wr = Wr_cur;
 
+    *Ia = Ialpha_cur ;
+    *Ib = -0.5*Ialpha_cur+(sqrt(3)/2)*Ibeta_cur;
+    *Ic = -0.5*Ialpha_cur-(sqrt(3)/2)*Ibeta_cur;
 }
 
