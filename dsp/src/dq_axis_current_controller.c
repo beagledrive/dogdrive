@@ -28,15 +28,14 @@
 
 /* ================================== FUNCTION DEFINITIONS ================== */
 
-void PI_StructInit(PI_Typedef *PI_Struct,float InertiaConst,float PolePair, float SVScalingConst,
-			float SpdCtrlBwidth,float Tsamp,float R_active,float L_leak,
-			float V_max, float V_min)
+void PI_StructInit(PI_Typedef *PI_Struct,float RStator,float CurrCtrlBwidth,float Tsamp,
+			float L_leak, float V_max, float V_min)
 {
-    PI_Struct->Kp = (2*SVScalingConst*SpdCtrlBwidth*InertiaConst)/(3*pow(PolePair,2));
-    PI_Struct->Ki = PI_Struct->Kp*SpdCtrlBwidth;
+    PI_Struct->Kp = CurrCtrlBwidth*L_leak;
+    PI_Struct->Ki = CurrCtrlBwidth*RStator;
     PI_Struct->Int_pre = 0;
     PI_Struct->Ts = Tsamp;
-    PI_Struct->Ra = R_active;
+    PI_Struct->Ra = CurrCtrlBwidth*L_leak - RStator;
     PI_Struct->Lsigma = L_leak;
     PI_Struct->V_ulim = V_max;
     PI_Struct->V_llim = V_min;

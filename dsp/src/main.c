@@ -125,8 +125,7 @@ int main(int argc, char *argv[])
 		       	DAMPING_CONST,SPD_CTRL_BANDWIDTH, MAX_CURRENT, MIN_CURRENT, NOM_CURRENT);
 
 	// Initialize PI controller - check KP KI, RACTIVE VMIN and VMAX Parameters
-	PI_StructInit(&PI_Control, MECH_INERTIA_CONST, POLE_PAIRS, SV_SCALING_CONST,
-		       	SPD_CTRL_BANDWIDTH, SAMPLING_TIME, ROTOR_RESISTANCE,
+	PI_StructInit(&PI_Control, STATOR_RESISTANCE, CURR_CTRL_BANDWIDTH,SAMPLING_TIME,
 		       	LEAKAGE_INDUCTANCE, VOLTAGE_MAX, VOLTAGE_MIN);
 
 	// Iteration variable: number of cycles to run

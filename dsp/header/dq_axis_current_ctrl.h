@@ -35,9 +35,8 @@ typedef struct
 /*
  * Initialize PI controller struct
  */
-void PI_StructInit(PI_Typedef *PI_Struct,float InertiaConst,float PolePair, float SVScalingConst,
-			float SpdCtrlBwidth,float Tsamp,float R_active,float L_leak,
-			float V_max, float V_min);
+void PI_StructInit(PI_Typedef *PI_Struct,float RStator,float CurrCtrlBwidth,float Tsamp,
+			float L_leak, float V_max, float V_min);
 
 /*
  * PI controller function
