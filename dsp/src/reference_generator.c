@@ -17,7 +17,6 @@
 #include <stdlib.h>
 #include <math.h>
 
-#include <tralgo.h>
 #include <Reference_generator.h>
 
 /* ================================== MACROS ================================ */
