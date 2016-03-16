@@ -134,6 +134,11 @@ int main(int argc, char *argv[])
 	int lim = atoi(argv[1]);
 	while(!b_error) 
 	{
+
+		// Control loop length for testing
+		if (i == lim) { b_error = 1; break; }
+		i++;
+
 		// Simulate Induction Motor
 		fprintf(stderr, "IM_model input: V_alpha = %f, V_beta = %f, Torque_Load = %f\n",
 			       	V_alpha, V_beta, Torque_load);
@@ -180,10 +185,6 @@ int main(int argc, char *argv[])
 				V_alpha, V_beta, V_a, V_b, V_c);
 
 		fprintf(stderr, "=========================================================================\n\n");
-		
-		// Control loop length for testing
-		i++;
-		if (i == lim) { b_error = 1; }	
 	}
 
 	return -1;
