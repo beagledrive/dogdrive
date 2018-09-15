@@ -1,0 +1,23 @@
+# pack-refs with: peeled fully-peeled 
+12f2f8d2f9adeeaf3d463704b0cfa1a4ff62bff4 refs/heads/master
+e742ff15f7abbc2cf80141ea49269eb0a2f2a8b3 refs/heads/pinmux-mode
+cce35b20e2aad47c2e2af56f23e3896d24d36fca refs/pull/1/head
+d91f83adb8f8b8d64875fcaa58a8bc48f9322ffe refs/pull/10/head
+5d14bb5d4b6324caa77aec246797144e971fc6f9 refs/pull/11/head
+641c0a223edfc5414e4b4f9d8ffaa419fcf07ce6 refs/pull/12/head
+769450e501c58e600c43d8d5049385cd621912e3 refs/pull/14/head
+4fdbd372c09db553cf5cf0786a6f1e5e5baa24a1 refs/pull/15/head
+222119524db2e4805115fa8d99f53a1b898a6b3e refs/pull/16/head
+47b9ee81188a23778c50956e07b9e653fffd99db refs/pull/17/head
+a178ed7fb5742691f8fb7399d61878d506f9a144 refs/pull/19/head
+1bd833ae30803db0c848508491cceb78ba903b9c refs/pull/2/head
+233191d4c4ee19198c7a6327602b503290ee10f6 refs/pull/20/head
+7a80e46cdb74e0ec1741d9a2f8e8e666942d974b refs/pull/26/head
+f483d6105b90fa45cda30269292dc47b615b5e49 refs/pull/3/head
+ded1d66582032dfa891fdf14e667c77c7dbd61ef refs/pull/30/head
+57363278eb3472f1b6fe3ef233b399a96a8ccb2a refs/pull/32/head
+c11800da68802bc1d95b973331943738268341be refs/pull/34/head
+5ca7d3ea087abfae583624465731fed5b17e473c refs/pull/4/head
+2f42fb050abf6d783add6550e1686393426afffe refs/pull/5/head
+83fad74868b881d2bd3e6b06d3534220c5a946f1 refs/pull/8/head
+1270eed94b69be376e7c8011043501838dd34e4e refs/pull/9/head

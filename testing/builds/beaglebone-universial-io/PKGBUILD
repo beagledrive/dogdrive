@@ -1,0 +1,49 @@
+# Maintainer: Kristian Ronnberg <kristian.k.ronnberg@se.abb.com>
+_pkgname=beaglebone-universal-io
+pkgname="${_pkgname}-git"
+pkgver=r72.12f2f8d
+pkgrel=1
+epoch=
+pkgdesc="Device tree overlay and support scripts for using most available hardware I/O on the BeagleBone without editing dts files or rebuilding the kernel"
+arch=('armv7h')
+url="https://github.com/cdsteinkuehler/beaglebone-universal-io"
+license=('GPL2')
+groups=()
+depends=()
+makedepends=('git' 'dtc-overlay')
+checkdepends=()
+optdepends=()
+provides=("${_pkgname}")
+conflicts=("${_pkgname}")
+replaces=()
+backup=()
+options=()
+install=
+changelog=
+source=("git+https://github.com/cdsteinkuehler/${_pkgname}")
+noextract=()
+md5sums=('SKIP')
+
+_prefix="$pkgdir/usr/bin"
+_firmwarepath="$pkgdir/usr/lib/firmware"
+
+pkgver() {
+        cd "$srcdir/${_pkgname}"
+        printf "r%s.%s" "$(git rev-list --count HEAD)" "$(git rev-parse --short HEAD)"
+}
+
+prepare() {
+	cd "$srcdir/${_pkgname}"
+	#bash -c "sed -i 's:\#\!/bin/dash:\#\!/bin/bash' ./config-pin"
+	sed -i 's:\#\!/bin/dash:\#\!/bin/bash:' ./config-pin
+}
+
+build() {
+	cd "$srcdir/${_pkgname}"
+	make PREFIX="$pkgdir/usr/bin" FIRMWAREPATH="$pkgdir/usr/lib/firmware" build
+}
+
+package() {
+	cd "$srcdir/${_pkgname}"
+	make PREFIX="$pkgdir/usr/bin" FIRMWAREPATH="$pkgdir/usr/lib/firmware" ensure_path install
+}

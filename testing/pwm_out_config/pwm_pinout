@@ -1,0 +1,11 @@
+# EHRPWM2
+p8_13 pwm #B
+p8_19 pwm #A
+
+# EHRPWM1
+p8_34 pwm #B
+p8_36 pwm #A
+
+# EHRPWM0
+p9_29 pwm #B
+p9_31 pwm #A
