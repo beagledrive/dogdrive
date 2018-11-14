@@ -1,33 +1,35 @@
 #
 # Sample makefile to compile template files
 
-TARGET = tempexec
+TARGET = build
 # source directory
 SRC_DIR = ./src
 # include directory
-INC_DIR = ./header
-# build directory
-OBJ_DIR = ./obj
+INCLUDES = ./header
 
 # -g debug information for the executable
 # -Wall compiler warnings
 CC = gcc
-CFLAGS = -g -Wall -I$(INC_DIR)
+CFLAGS = -g -Wall -I$(INCLUDES)
 
 # dependencies
-_DEPS = template.h
-DEPS = $(patsubst %,$(INC_DIR)/%,$(_DEPS))
-_OBJS = template.o tempfunc.o
-OBJS = $(patsubst %,$(OBJ_DIR)/%,$(_OBJS))
+SRCS = $(wildcard $(SRC_DIR)/*.c)
+OBJS = $(SRCS:.c=.o)
 
 # build objects
-$(OBJ_DIR)/%.o: $(SRC_DIR)/%.c  $(DEPS)
-	$(CC) -c -o $@ $< $(CFLAGS)
+#$(OBJ_DIR)/%.o: $(SRC_DIR)/%.c  $(DEPS)
+#	$(CC) -c -o $@ $< $(CFLAGS)
 # build target
+#$(TARGET): $(OBJS)
+#	$(CC) -o $@ $^ $(CFLAGS)
+
+$(SRC_DIR)/%.o: $(SRC_DIR)/%.c
+	$(CC) -c -o $@ $< $(CFLAGS)	
+
 $(TARGET): $(OBJS)
-	$(CC) -o $@ $^ $(CFLAGS)
+	$(CC) $(CFLAGS) -o $@ $^
 
 .PHONY: clean
 
 clean:
-	rm -f $(OBJ_DIR)/*.o *~ core $(INC_DIR)/*~ $(SRC_DIR)/*~
+	rm -f $(OBJS) *~ core $(INCLUDES)/*~ $(SRC_DIR)/*~ $(TARGET)
