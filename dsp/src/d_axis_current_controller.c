@@ -2,7 +2,6 @@
 #include <stdlib.h>
 
 /*******  d-axis Current Controller ******/
-// This code is not yet tested
 
 typedef struct
 {
@@ -35,17 +34,45 @@ void PI_StructInit(PI_Typedef *PI_Struct,float PropCoeffi,float IntCoffi,float T
 void PI_Controller(PI_Typedef *PI_Struct,float Id_ref,float Id,float Iq,float w1,float *Vd_ref)
 {
     float Err_d = 0;
+    float Pro_cur_d = 0;
+    int AW_Flag = 0;
     float Int_cur_d = 0;
     float w1L = 0;
+    float Cca_cur_d = 0;
     float V_ref = 0;
+
+
+    // Error Computation
 
     Err_d = Id_ref - Id;                                                                                // compute error
 
-    Int_cur_d = PI_Struct->Int_pre_d + PI_Struct->Ts*Err_d;                                                        // update integral part due to error, anti-windup is ignored in this step
+    // Proportional part of the PI Controller
 
-    w1L = PI_Struct->Lsigma*w1;                                                                        // compute w1L
+    Pro_cur_d = PI_Struct->Kp*Err_d;
 
-    V_ref = PI_Struct->Kp*Err_d + PI_Struct->Ki*Int_cur_d - PI_Struct->Ra*Id - w1L*Iq ;               // update reference voltage including active resistance and cross coupling cancellation
+    // Integral part of the PI controller
+    // Depending on the status of the Anti-windup flag status, integral controller either keeps on integrating
+    // or freezes its value to the previous value
+
+    if(AW_Flag == 0)
+    {
+        Int_cur_d = PI_Struct->Int_pre_d + PI_Struct->Ts*Err_d;
+    }
+
+    else
+    {
+        Int_cur_d = PI_Struct->Int_pre_d;
+    }
+
+    // Compute cross-coupling and active resistance
+
+    w1L = PI_Struct->Lsigma*w1;                                  //cross-coupling coefficient
+
+    Cca_cur_d = PI_Struct->Ra*Id + w1L*Iq;                       // contribution from cross coupling and active resistance
+
+    // Output of the PI controller
+
+    V_ref = Pro_cur_d + PI_Struct->Ki*Int_cur_d - Cca_cur_d ;   // update reference voltage including active resistance and cross coupling cancellation
 
     // Saturation Implementation
 
@@ -64,17 +91,19 @@ void PI_Controller(PI_Typedef *PI_Struct,float Id_ref,float Id,float Iq,float w1
         *Vd_ref = V_ref;
     }
 
-    // Anti windup implementation - this implementation is the one Luca discussed in the meeting, not the one from the course book
+    // Anti windup status
 
     if(*Vd_ref - V_ref == 0)
     {
-        PI_Struct->Int_pre_d = Int_cur_d;
+        AW_Flag = 0;
     }
 
     else
     {
-        PI_Struct->Int_pre_d = 0;
+        AW_Flag = 1;
     }
+
+    PI_Struct->Int_pre_d = Int_cur_d;
 
 }
 
