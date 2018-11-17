@@ -10,7 +10,7 @@ INCLUDES = ./header
 # -g debug information for the executable
 # -Wall compiler warnings
 CC = gcc
-CFLAGS = -g -Wall -I$(INCLUDES)
+CFLAGS = -g -Wall -I$(INCLUDES) -lm
 
 # dependencies
 SRCS = $(wildcard $(SRC_DIR)/*.c)

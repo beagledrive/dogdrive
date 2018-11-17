@@ -16,12 +16,18 @@ typedef struct
 
 }PI_Typedef;
 
-void PI_StructInit(PI_Typedef *PI_Struct,float PropCoeffi,float IntCoffi,float Tsamp,float R_active,float L_leak,float Vq_max, float Vq_min);
-void PI_Controller(PI_Typedef *PI_Struct,float Iq_ref,float Iq,float Id,float w1,float *Vq_ref);
+void PI_q_StructInit(PI_Typedef *PI_Struct,float PropCoeffi,float IntCoffi,
+			float Tsamp,float R_active,float L_leak,float Vq_max, float Vq_min);
 
-void PI_StructInit(PI_Typedef *PI_Struct,float PropCoeffi,float IntCoffi,float Tsamp,float R_active,float L_leak)
+void PI_q_Controller(PI_Typedef *PI_Struct,float Iq_ref,float Iq,float Id,
+			float w1,float *Vq_ref);
+
+
+
+void PI_q_StructInit(PI_Typedef *PI_Struct,float PropCoeffi,float IntCoffi,float Tsamp,
+			float R_active,float L_leak,float Vq_max, float Vq_min)
 {
-    PI_Struct->Kp = PorpCoeffi;
+    PI_Struct->Kp = PropCoeffi;
     PI_Struct->Ki = IntCoffi;
     PI_Struct->Int_pre_q = 0;
     PI_Struct->Ts = Tsamp;
@@ -31,7 +37,7 @@ void PI_StructInit(PI_Typedef *PI_Struct,float PropCoeffi,float IntCoffi,float T
     PI_Struct->Vq_llim = Vq_min;
 
 }
-void PI_Controller(PI_Typedef *PI_Struct,float Iq_ref,float Iq,float Id,float w1,float *Vq_ref)
+void PI_q_Controller(PI_Typedef *PI_Struct,float Iq_ref,float Iq,float Id,float w1,float *Vq_ref)
 {
     float Err_q = 0;
     float Pro_cur_q = 0;

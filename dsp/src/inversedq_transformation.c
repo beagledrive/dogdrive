@@ -1,5 +1,8 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <math.h>
+
+#include <tralgo.h>
 
 /*******  inverse d-q transformation ******/
 
@@ -10,14 +13,18 @@ typedef struct
 }IDQ_Typedef;
 
 void IDQ_StructInit(IDQ_Typedef *IDQ_Struct,float SpcVectScaling);
-void IDQ_Transformation(IDQ_Typedef *IDQ_Struct,float Vd,float Vq,float theta1,float *Valpha,float *Vbeta,float *Va,float *Vb,float *Vc);
+
+void IDQ_Transformation(IDQ_Typedef *IDQ_Struct,float Vd,float Vq,float theta1,
+			float *Valpha,float *Vbeta,float *Va,float *Vb,float *Vc);
+
 
 void IDQ_StructInit(IDQ_Typedef *IDQ_Struct,float SpcVectScaling)
 {
     IDQ_Struct->K = SpcVectScaling;
 
 }
-void IDQ_Transformation(IDQ_Typedef *IDQ_Struct,float Vd,float Vq,float theta1,float *Valpha,float *Vbeta,float *Va,float *Vb,float *Vc)
+void IDQ_Transformation(IDQ_Typedef *IDQ_Struct,float Vd,float Vq,float theta1,
+			float *Valpha,float *Vbeta,float *Va,float *Vb,float *Vc)
 {
     float sin_theta1 = 0;
     float cos_theta1 = 0;
@@ -33,10 +40,10 @@ void IDQ_Transformation(IDQ_Typedef *IDQ_Struct,float Vd,float Vq,float theta1,f
 
     // alpha-beta to a-b-c transformation
 
-    *Ia = *Valpha/DQ_Struct->K;
+    *Va = *Valpha/IDQ_Struct->K;
 
-    *Ib = (-(*Valpha) + sqrt(3)*(*Vbeta))/(2*IDQ_Struct->K);
+    *Vb = (-(*Valpha) + sqrt(3)*(*Vbeta))/(2*IDQ_Struct->K);
 
-    *Ic = (-(*Valpha) - sqrt(3)*(*Vbeta))/(2*IDQ_Struct->K);
+    *Vc = (-(*Valpha) - sqrt(3)*(*Vbeta))/(2*IDQ_Struct->K);
 }
 

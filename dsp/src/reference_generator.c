@@ -1,5 +1,10 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <math.h>
+
+#include <tralgo.h>
+
+
 #define PI 3.14159265358979323846  // I have to check this
 
 /*******  Reference Generator ******/
@@ -41,10 +46,18 @@ typedef struct
 
 }RG_Typedef;
 
-void RG_StructInit(RG_Typedef *RG_Struct,float BaseVolt,float ResCons,float BaseAngularspeed,float RotorRes,float LeakageInd,float MagnetizingInd,float Tsamp,float PropCoeffi,float IntCoffi,float b_active,float MaxCur,float MinCur, float NomCur);
-void RG_Controller(RG_Typedef *RG_Struct,float Vd_ref,float Vq_ref,float Wr_ref,float Wr,float *Id_ref,float *Iq_ref,float *W1,float *theta1);
+void RG_StructInit(RG_Typedef *RG_Struct,float BaseVolt,float ResCons,float BaseAngularspeed,
+			float RotorRes,float LeakageInd,float MagnetizingInd,float Tsamp,
+			float PropCoeffi,float IntCoffi,float b_active,float MaxCur,
+			float MinCur, float NomCur);
 
-void RG_StructInit(PI_Typedef *PI_Struct,float PropCoeffi,float IntCoffi,float Tsamp,float R_active,float L_leak)
+void RG_Controller(RG_Typedef *RG_Struct,float Vd_ref,float Vq_ref,float Wr_ref,float Wr,
+			float *Id_ref,float *Iq_ref,float *W1,float *theta1);
+
+void RG_StructInit(RG_Typedef *RG_Struct,float BaseVolt,float ResCons,float BaseAngularspeed,
+			float RotorRes,float LeakageInd,float MagnetizingInd,float Tsamp,
+			float PropCoeffi,float IntCoffi,float b_active,float MaxCur,
+			float MinCur, float NomCur)
 {
     RG_Struct->Vbase = BaseVolt;
     RG_Struct->K_reservoir = ResCons;
@@ -54,7 +67,7 @@ void RG_StructInit(PI_Typedef *PI_Struct,float PropCoeffi,float IntCoffi,float T
     RG_Struct->Lsigma = LeakageInd;
     RG_Struct->L_M = MagnetizingInd;
     RG_Struct->Ts = Tsamp;
-    RG_Struct->Kps_c = PorpCoeffi;
+    RG_Struct->Kps_c = PropCoeffi;
     RG_Struct->Kis_c = IntCoffi;
     RG_Struct->ba_c = b_active;
     RG_Struct->int_fw_pre = 0;
@@ -66,7 +79,8 @@ void RG_StructInit(PI_Typedef *PI_Struct,float PropCoeffi,float IntCoffi,float T
     RG_Struct->Inom = NomCur;
 
 }
-void RG_Controller(RG_Typedef *RG_Struct,float Vd_ref,float Vq_ref,float Wr_ref,float Wr,float *Id_ref,float *Iq_ref,float *W1,float *theta1 )
+void RG_Controller(RG_Typedef *RG_Struct,float Vd_ref,float Vq_ref,float Wr_ref,
+			float Wr,float *Id_ref,float *Iq_ref,float *W1,float *theta1 )
 {
     float Verr = 0;
     float W_max = 0;
@@ -81,6 +95,11 @@ void RG_Controller(RG_Typedef *RG_Struct,float Vd_ref,float Vq_ref,float Wr_ref,
     float es = 0;
     float pro_s = 0;
     float int_s_cur = 0;
+    float AW_Flag = 0;
+    float ar_s = 0;
+    float Iq_ref_nom = 0;
+    float zita = 0;
+    float Iq_ref_max = 0;
 
     // Field weakening control - d-axis current reference generation
     // Field weakening control is integral control
@@ -102,20 +121,20 @@ void RG_Controller(RG_Typedef *RG_Struct,float Vd_ref,float Vq_ref,float Wr_ref,
 
     // Integral gain of the field weakening control
 
-    Kfw_den = RG_Struct->Lsigma*RG_Struct->Lsigma*RG_Struct->Vbase*w_max;
+    Kfw_den = RG_Struct->Lsigma*RG_Struct->Lsigma*RG_Struct->Vbase*W_max;
 
     K_fw = RG_Struct->Ts*RG_Struct->R_R/Kfw_den;
 
-    Id_cur = int_fw_pre + K_fw*Verr;
+    Id_cur = RG_Struct->int_fw_pre + K_fw*Verr;
 
     if (Id_cur < RG_Struct->Imin)
     {
-        Id_cur = Imin;
+        Id_cur = RG_Struct->Imin;
     }
 
     if (Id_cur > RG_Struct->Inom)
     {
-        Id_cur = Inom;
+        Id_cur = RG_Struct->Inom;
     }
 
     *Id_ref = Id_cur;
@@ -126,9 +145,9 @@ void RG_Controller(RG_Typedef *RG_Struct,float Vd_ref,float Vq_ref,float Wr_ref,
 
     psi_den = 1 + RG_Struct->Ts*RG_Struct->R_R/RG_Struct->L_M;
 
-    psi_cur = RG_Struct->Ts*RG_Struct->R_R*(*Id_ref)/psi_den + psi_pre/psi_den;
+    psi_cur = RG_Struct->Ts*RG_Struct->R_R*(*Id_ref)/psi_den + RG_Struct->psi_pre/psi_den;
 
-    psi_pre = psi_cur;
+    RG_Struct->psi_pre = psi_cur;
 
 
     // Speed regulator proportional, integral and active resistance coefficients
@@ -151,12 +170,12 @@ void RG_Controller(RG_Typedef *RG_Struct,float Vd_ref,float Vq_ref,float Wr_ref,
 
     if(AW_Flag == 0)
     {
-        int_s_cur = PI_Struct->int_s_pre + PI_Struct->Ts*es;
+        int_s_cur = RG_Struct->int_s_pre + RG_Struct->Ts*es;
     }
 
     else
     {
-        int_s_cur = PI_Struct->int_s_pre;
+        int_s_cur = RG_Struct->int_s_pre;
     }
 
     // Active resistance part of the speed regulator
@@ -191,7 +210,7 @@ void RG_Controller(RG_Typedef *RG_Struct,float Vd_ref,float Vq_ref,float Wr_ref,
         AW_Flag = 0;
     }
 
-    PI_Struct->int_s_pre = int_s_cur;
+    RG_Struct->int_s_pre = int_s_cur;
 
     // Rotor position estimation
 

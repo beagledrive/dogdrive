@@ -1,10 +1,8 @@
-// CPP code for implementing sin function
-#include <iostream>
 #include <math.h>
-using namespace std;
+#include <tralgo.h>
 
 // Function for calculating sin value
-void cal_sin(float n)
+float cal_sin(float n)
 {
 	float accuracy = 0.0001, denominator, sinx, sinval;
 
@@ -16,12 +14,13 @@ void cal_sin(float n)
 	// holds the actual value of sin(n)
 	sinval = sin(n);
 	int i = 1;
-	do
+	while (accuracy <= fabs(sinval-sinx))
 	{
 		denominator = 2 * i * (2 * i + 1);
 		x1 = -x1 * n * n / denominator;
 		sinx = sinx + x1;
 		i = i + 1;
-	} while (accuracy <= fabs(sinval - sinx));
-	cout << sinx;
+	};
+
+	return sinx;
 }

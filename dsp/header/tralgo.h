@@ -15,9 +15,18 @@
  * Use only if the above are needed in multiple source files, otherwise leave header file empty.
  */
 
+
 /*
- * This is just a simple increment funtion for illustrative purposes only
+ * Cos-compute function for d-q transformation
  */
-void recruit_legionnaire(int *num_of_units);
+float cal_cos(float n);
+
+/*
+ * Sin-compute function for d-q transformation
+ */
+float cal_sin(float n);
+
+
+
 
 #endif

@@ -1,5 +1,8 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <math.h>
+
+#include <tralgo.h>
 
 /*******  d-q transformation ******/
 
