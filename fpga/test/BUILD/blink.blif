@@ -134,6 +134,13 @@
 .attr module_not_derived 00000000000000000000000000000001
 .attr src "top.v:4|/usr/local/bin/../share/yosys/ice40/arith_map.v:53"
 .param LUT_INIT 0110100110010110
+.gate SB_CARRY CI=$auto$alumacc.cc:474:replace_alu$5.C[26] CO=$auto$alumacc.cc:474:replace_alu$5.C[27] I0=$false I1=counter[26]
+.attr module_not_derived 00000000000000000000000000000001
+.attr src "top.v:4|/usr/local/bin/../share/yosys/ice40/arith_map.v:47"
+.gate SB_LUT4 I0=$false I1=$false I2=counter[27] I3=$auto$alumacc.cc:474:replace_alu$5.C[27] O=$0\counter[27:0][27]
+.attr module_not_derived 00000000000000000000000000000001
+.attr src "top.v:4|/usr/local/bin/../share/yosys/ice40/arith_map.v:53"
+.param LUT_INIT 0110100110010110
 .gate SB_LUT4 I0=$false I1=$false I2=counter[2] I3=$auto$alumacc.cc:474:replace_alu$5.C[2] O=$0\counter[27:0][2]
 .attr module_not_derived 00000000000000000000000000000001
 .attr src "top.v:4|/usr/local/bin/../share/yosys/ice40/arith_map.v:53"
@@ -271,14 +278,15 @@
 .gate SB_DFF C=clk D=$0\counter[27:0][26] Q=counter[26]
 .attr module_not_derived 00000000000000000000000000000001
 .attr src "top.v:4|/usr/local/bin/../share/yosys/ice40/cells_map.v:2"
-.names $undef counter[27]
+.gate SB_DFF C=clk D=$0\counter[27:0][27] Q=counter[27]
+.attr module_not_derived 00000000000000000000000000000001
+.attr src "top.v:4|/usr/local/bin/../share/yosys/ice40/cells_map.v:2"
+.names counter[24] led[0]
 1 1
-.names counter[23] led[0]
+.names counter[25] led[1]
 1 1
-.names counter[24] led[1]
+.names counter[26] led[2]
 1 1
-.names counter[25] led[2]
-1 1
-.names counter[26] led[3]
+.names counter[27] led[3]
 1 1
 .end

@@ -16,6 +16,7 @@
 	/* state the resources this cape uses */
 	exclusive-use =
 		/* the pin header uses */
+		"P9.23", 	/* bw_irq_fpga2dsp*/
 		"P9.31",	/* bw_spi1_sclk */
 		"P9.29",	/* bw_spi1_d0 */
 		"P9.30",	/* bw_spi1_d1 */
@@ -51,7 +52,6 @@
 	fragment@0 {
 		target = <&am33xx_pinmux>;
 		__overlay__ {
-			/*CH - sets up the SPI pin configs */
 			bw_spi1_pins: pinmux_bw_spi1_pins {
 				pinctrl-single,pins = <
 					0x190 0x33	/* mcasp0_aclkx.spi1_sclk, INPUT_PULLUP | MODE3 */
@@ -63,7 +63,12 @@
 				>;
 			};
 
-			/* CH - sets up the pin configs */
+			bw_irq_pins: pinmux_bw_irq_pins {
+				pinctrl-single,pins = <
+					0x044 0x37	/* irq_fpga2dsp MODE 7 | INPUT | PULLUP */
+				>;
+			};
+
 			bw_gpmc_pins: pinmux_bw_gpmc_pins {
 				pinctrl-single,pins = <
 					0x000 0x30	/* gpmc_ad0.gpmc_ad0 MODE0 | INPUT | PULLUP */
@@ -176,4 +181,15 @@
 			};
 		};
 	};
+	// NOT WORKING------------------------------
+	fragment@3 {
+		target = <&ocp>;
+		__overlay__ {
+			pinctrl-names = "default";
+			pinctrl-0 = <&bw_irq_pins>;
+			status = "okay";
+		};
+			
+	};
+
 };

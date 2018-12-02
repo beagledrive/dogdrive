@@ -78,3 +78,6 @@ set_io pmod4[4] 4  # PMOD4 A1
 set_io pmod4[5] 8  # PMOD4 A2
 set_io pmod4[6] 10 # PMOD4 A3
 set_io pmod4[7] 11 # PMOD4 A4
+
+# GPIO
+set_io irq_in 63 # GPIO Interrupt FPGA_to_ARM

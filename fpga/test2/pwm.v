@@ -1,4 +1,4 @@
-module pwm (input                     rst,
+module pwm (input                     rst, 
             input                     en,
             input [COUNTER_WIDTH-1:0] period,
             input [COUNTER_WIDTH-1:0] duty_cycle,

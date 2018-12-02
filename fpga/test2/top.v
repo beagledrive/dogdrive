@@ -6,6 +6,7 @@ module top (input         clk,
             input         gpmc_wein,
             input         gpmc_oen,
             input         gpmc_clk,
+	    output	  irq_in,
             input  [1:0]  btn,
             output [7:0]  pmod1,
             output [7:0]  pmod2,
@@ -21,21 +22,110 @@ reg [DATA_WIDTH-1:0] mem [0:RAM_DEPTH];
 reg oe;
 reg we;
 reg cs;
+
+// Countermax = 2s with 200M clk
+reg [24:0] counter = 0;
+
 wire[ADDR_WIDTH-1:0]  addr;
 reg [DATA_WIDTH-1:0]  data_out;
 wire [DATA_WIDTH-1:0]  data_in;
 
+// set period to PWM period
+//parameter PERIOD = 1/10000;
+parameter PERIOD_FPGA = 5;
+parameter PERIOD_CLK = 20000; //PERIOD*1000000000/PERIOD_FPGA;  // 10kHz period with 200MHz clock is 20000 cycles
+parameter IRQ_PERIOD = 100;  
+parameter IRQ_TRIGGER = 0; // IRQ start
+parameter DVALID_TRIGGER = 200; // Time before end period when valid data required
+
+
+wire [31:0] sw_on_mem;
+wire [31:0] sw_off_mem;
+wire data_valid_mem; // dsp sets to 1 on data transfer, fpga resets at start of period
+wire pwm_en; 
+wire pwm_re; // Reset
+wire pwm_pol; // polarity
+
+assign sw_on_mem[15:0] = mem[2];
+assign sw_on_mem[31:16] = mem[1];
+assign sw_off_mem[15:0] = mem[4];
+assign sw_off_mem[31:16] = mem[3];
+assign data_valid_mem = mem[0][3];
+assign pwm_en = mem[0][1];
+assign pwm_re = mem[0][0];
+assign pwm_pol = mem[0][2];
+
+reg [31:0] sw_on_next;
+reg [31:0] sw_off_next;
+reg [31:0] sw_on_curr;
+reg [31:0] sw_off_curr;
+reg data_valid;
+
+// Main Routine
+always @ (posedge clk_200m)
+begin
+	
+	// IRQ occurs at start period - could change to before start
+	if (counter == IRQ_TRIGGER) begin
+		irq_in <= 1;
+	end else if (counter == (IRQ_TRIGGER+IRQ_PERIOD)) begin
+		irq_in <= 0;
+	end
+	
+	// Complete PWM switching
+	if (counter >= sw_off_curr) begin
+		pmod1[0] <= 0;
+	end else if (counter >= sw_on_curr) begin
+		pmod1[0] <= 1;
+	end else begin
+		pmod1[0] <= 0;
+	end	
+
+	// Reset data valid register to zero
+	//	if (counter == IRQ_TRIGGER) begin
+	//	data_valid_mem <= 1;
+	// end
+
+	// Complete data check and protection before end period 
+	if ((counter == (PERIOD_CLK - DVALID_TRIGGER)) && data_valid_mem) begin	
+		// HOLD - protection functions
+		// Currently just set the registers to be the memory location
+		// value in sw on mem is a clock counter (ns)
+		if (data_valid_mem) begin
+			data_valid <= data_valid_mem;
+			sw_on_next <= sw_on_mem;
+			sw_off_next <= sw_off_mem;
+		end else begin
+			sw_on_next <= 0;
+			sw_off_next <=0;
+		end
+	end
+
+	// At end of period set the next switches to the current 
+	if (counter == PERIOD_CLK) begin 
+		sw_on_curr <= sw_on_next;
+		sw_off_curr <= sw_off_next;
+	end
+	
+	// Reset or increment counter
+	if (counter == PERIOD_CLK) begin
+		counter <= 0;
+	end else begin
+		counter <= counter + 1'b1;
+	end
+end
+
 // terminology is from DSP / GPMC perspective
 // write enable so set memory address to GPMC pin data
-always @ (posedge clk)
+always @ (posedge clk_200m)
 begin
     if (!cs && !we && oe) begin
         mem[addr] <= data_out;
-    end
+    end 
 end
 
 // output enable so set the data in to the memory address
-always @ (posedge clk)
+always @ (posedge clk_200m)
 begin
     if (!cs && we && !oe) begin
         data_in <= mem[addr];
@@ -67,6 +157,10 @@ gpmc_controller (
 
 initial begin
     mem[0][0] = 1'b1;
+    mem[1]= 0;
+    mem[2] = 0;
+    mem[3] = 0;
+    mem[4] = 0;
 end
 
 wire clk_200m;
@@ -87,14 +181,7 @@ wire lock;
         .PLLOUTCORE(clk_200m)
     );
 
-wire [31:0] period;
-wire [31:0] duty_cycle;
-
-assign period[15:0] = mem[2];
-assign period[31:16] = mem[1];
-assign duty_cycle[15:0] = mem[4];
-assign duty_cycle[31:16] = mem[3];
-
+/*
 pwm pwm1 (
     .rst(mem[0][0]),
     .en(mem[0][1]),
@@ -104,5 +191,5 @@ pwm pwm1 (
     .clk(clk_200m),
     .out(pmod1[0]),
 );
-
+*/
 endmodule
