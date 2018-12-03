@@ -48,9 +48,9 @@ void RG_StructInit(RG_Typedef *RG_Struct,float BaseVolt,float ResCons,float Base
     	RG_Struct->Lsigma = LeakageInd;
     	RG_Struct->L_M = MagnetizingInd;
     	RG_Struct->Ts = Tsamp;
-    	RG_Struct->Kps_c = (2*SVScalingConst*SpdCtrlBwidth*InertiaConst)/(3*pow(PolePair,2));
+    	RG_Struct->Kps_c = (SpdCtrlBwidth*InertiaConst)/(PolePair);
     	RG_Struct->Kis_c = RG_Struct->Kps_c*SpdCtrlBwidth;
-    	RG_Struct->ba_c = (2*SVScalingConst*(SpdCtrlBwidth*InertiaConst-DampingConst))/(3*pow(PolePair,2)) ;
+    	RG_Struct->ba_c = ((SpdCtrlBwidth*InertiaConst-DampingConst))/(PolePair) ;
     	RG_Struct->int_fw_pre = 0;
     	RG_Struct->psi_pre = 0;
     	RG_Struct->int_s_pre = 0;

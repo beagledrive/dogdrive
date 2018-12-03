@@ -40,10 +40,13 @@ void IM_StructInit(IM_Typedef *IM_Struct,float Rstator,float Rrotor,float Lleak,
     IM_Struct->K = SpcVectScaling;
     IM_Struct->J = InrConst;
     IM_Struct->b = DampConst;
+    IM_Struct->psi_a_pre = 0;
+    IM_Struct->psi_b_pre = 0;
 }
 
 void IM_model(IM_Typedef *IM_Struct,float Valpha,float Vbeta,float TL,
-			float *Ia,float *Ib,float *Ic, float *Wr)
+			float *Ia,float *Ib,float *Ic, float *Ialpha,
+		        float *Ibeta, float *TM_cur, float *Wr)
 {
 
     // Parameters for inverse T-equivalent circuit for induction motor
@@ -75,6 +78,12 @@ void IM_model(IM_Typedef *IM_Struct,float Valpha,float Vbeta,float TL,
     float Wr_cur = 0;
     float Wr_pre = 0;
 
+
+    Ialpha_pre = *Ialpha;
+    Ibeta_pre = *Ibeta;
+    Wr_pre = *Wr;
+    psi_alpha_pre = IM_Struct->psi_a_pre;
+    psi_beta_pre = IM_Struct->psi_b_pre;
 
     // Computation
     Valpha_cur = Valpha;
@@ -110,7 +119,7 @@ void IM_model(IM_Typedef *IM_Struct,float Valpha,float Vbeta,float TL,
 		    - (IM_Struct->Ts*Wr_pre)*psi_alpha_cur);
 
     // Developed electromagnetic torque
-    Te_cur = ((3*IM_Struct->Np)/(2*IM_Struct->K*IM_Struct->K))*(psi_alpha_cur*Ibeta_cur - psi_beta_cur*Ialpha_cur);
+    Te_cur = (psi_alpha_cur*Ibeta_cur - psi_beta_cur*Ialpha_cur);
 
     // Mechanical dynamics for inverse T-equivalent circuit for the induction motor
     C = 1 + (IM_Struct->Ts*IM_Struct->b/IM_Struct->J);
@@ -132,5 +141,11 @@ void IM_model(IM_Typedef *IM_Struct,float Valpha,float Vbeta,float TL,
     *Ia = Ialpha_cur ;
     *Ib = -0.5*Ialpha_cur+(sqrt(3)/2)*Ibeta_cur;
     *Ic = -0.5*Ialpha_cur-(sqrt(3)/2)*Ibeta_cur;
+
+    *Ialpha = Ialpha_cur;
+    *Ibeta = Ibeta_cur;
+    IM_Struct->psi_a_pre = psi_alpha_cur;
+    IM_Struct->psi_b_pre = psi_beta_cur;
+    *TM_cur = Te_cur;
 }
 

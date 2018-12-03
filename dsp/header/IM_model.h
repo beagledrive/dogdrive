@@ -27,6 +27,8 @@ typedef struct
     float K;                  // Space vector scaling constant
     float J;                  // Mechanical inertia constant
     float b;                  // damping constant
+    float psi_a_pre;
+    float psi_b_pre;
 
 } IM_Typedef;
 
@@ -43,6 +45,7 @@ void IM_StructInit(IM_Typedef *IM_Struct,float Rstator,float Rrotor,float Lleak,
  * Induction Model Function
  */
 void IM_model(IM_Typedef *IM_Struct,float Valpha,float Vbeta,float TL,
-			float *Ia,float *Ib,float *Ic,float *Wr);
+			float *Ia,float *Ib,float *Ic, float *Ialpha,
+			float *Ibeta, float *TM_cur,  float *Wr);
 
 #endif
