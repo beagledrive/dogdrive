@@ -7,15 +7,17 @@
 
 /* ================================== INCLUDES ============================== */
 
-#include <stdio.h>
 #include <stdlib.h>
 #include <sys/time.h>
+#include <sys/stat.h>
 
 #include <IM_model.h>
 #include <Reference_generator.h>
 #include <dq_transformation.h>
 #include <dq_axis_current_ctrl.h>
 #include <base_compute.h>
+#include <bw_bridge.h>
+#include <svpwm.h>
 
 
 /* ================================== MACROS ================================ */
@@ -38,6 +40,10 @@
 #define NOMINAL_DAMPING_CONST		(float)0.0024
 #define SAMPLING_TIME			(float)0.0001	// [s]
 #define RESERVOIR_CONST			(float)0.95
+#define TIME_OFFSET_FACTOR		(float)0.5
+
+// fix this to be sensor input
+#define VDC				(float)760
 
 
 /*
@@ -51,6 +57,31 @@
 #define D_AXIS_CONTROL			(int)1
 #define Q_AXIS_CONTROL			(int)0
 
+/*
+ * Needed for usleep() function
+ */
+#define _XOPEN_SOURCE 			500
+
+/*
+ * Memory map GPIO-based interrupt signal from FPGA to internal memory of DSP
+ */
+#define GPIO_START_ADDR			0x4804C000
+#define GPIO_END_ADDR			0x4804DFFF
+#define GPIO_SIZE 			(GPIO_END_ADDR - GPIO_START_ADDR)
+#define GPIO_DATAIN			0x138
+#define GPIO_PIN 			(1 << 17)	// PIN 17 on BB for interrupt
+
+/*
+ * Register location of commands to FPGA
+ */
+#define CONFIG_REG_L			(int)0
+#define CONFIG_REG_U			(int)1
+#define SW_ON_REG_L			(int)2
+#define SW_ON_REG_U			(int)3
+#define SW_OFF_REG_L			(int)4
+#define SW_OFF_REG_U			(int)5
+// Size of command register [uint16_t]
+#define COMMAND_REG_SIZE		(int)6
 
 
 /* ================================== TYPEDEFS ============================== */
@@ -59,11 +90,24 @@
 /* ================================== FUNCTION PROTOTYPES =================== */
 
 
+/*
+ * Function to send PWM regulation signals from DSP to shared GPMC memory
+ */
+int dsp_data_to_gpmc(const uint32_t P1_sw_on, const uint32_t P1_sw_off,
+			const uint32_t P2_sw_on, const uint32_t P2_sw_off,
+			const uint32_t P3_sw_on, const uint32_t P3_sw_off);
+
+/*
+ * Run control sequence and space vector modulation on interrupt cycle
+ */
+int control_loop();
+
+
 /* ================================== INTERNAL GLOBALS ====================== */
 
 
 /*
- * Noramlized P.U. values of motor parameters
+ * Normalized P.U. values of motor parameters
  */
 static float Stator_Resistance = 0;
 static float Rotor_Resistance = 0;
@@ -81,182 +125,359 @@ static float Min_Current = 0;
 static float Curr_Ctrl_Bandwidth = 0;
 static float Spd_Ctrl_Bandwidth = 0;
 static float Base_Ang_Freq = 0;
+/*********************************/
 
+/*
+ * Alpha/Beta voltage and current parameters
+ * Current load torque
+ * Phase currents
+ * Phase Voltages
+ * Motor Speed
+ * Reference D-Q voltages and motor speed
+ * Reference D-Q currents
+ * Rotor Position and angular speed
+ * D-Q Currents
+ */
+static float V_alpha = 0;
+static float V_beta = 0;
+
+#ifdef _DEBUG
+
+static float I_alpha = 0;
+static float I_beta = 0;
+static float TM_cur = 0;
+
+#endif
+
+static float I_a = 0;
+static float I_b = 0;
+static float I_c = 0;
+
+static float V_a = 0;
+static float V_b = 0;
+static float V_c = 0;
+
+static float W_r = 0;
+
+static float Vd_ref = 0;
+static float Vq_ref = 0;
+static float Wr_ref = 0;
+
+static float Id_ref = 0;
+static float Iq_ref = 0;
+
+static float W1 = 0;
+static float Theta1 = 0;
+
+static float Id = 0;
+static float Iq = 0;
+/*********************************/
+
+/*
+ * Induction Motor model
+ */
+static IM_Typedef Induction_Motor;
+
+/*
+ * Reference Generator
+ */
+static RG_Typedef Reference_Generator;
+
+/*
+ * PI Controller
+ */
+static PI_Typedef PI_Control;
+
+/*
+ * SVPWM Struct
+ */
+static SVPWM_Typedef SV_PWM;
+
+
+#ifdef _DEBUG
+
+/*
+ * File descriptor for debug CSV output
+ */
+static FILE* fd_csv;
+
+#endif
+
+/*
+ * PWM signal rise and fall times for the 3 phases
+ * measured in ns
+ */
+static uint32_t P1_rise;
+static uint32_t P1_fall;
+static uint32_t P2_rise;
+static uint32_t P2_fall;
+static uint32_t P3_rise;
+static uint32_t P3_fall;
+/*********************************/
 
 
 /* ================================== FUNCTION DEFINITIONS ================== */
 
 
-int main(int argc, char *argv[])
+int control_loop()
 {
+	int b_error = 0;		// Error bit for possible future error handling
 
-	if (argc != 2) {
-		fprintf(stderr, "Invalid arguments. Usage: ./build <num of iterations>, e.g.: ./build 3 \n");
+#ifdef _DEBUG
 
-		return 0;
-	}
-
-	int b_error = 0;
-
-	// Get TimeStamp
+	// Get TimeStamp for debug output
 	struct timeval tv;
 
-	// File to write CSV output
-	const char *fileName = "output.csv";
-	FILE *fd = fopen(fileName, "w");
-	// clear content of file first, then open for writing
-	if(fd == NULL)
+	// Simulate Induction Motor
+	IM_model(&Induction_Motor, V_alpha, V_beta, TORQUE_LOAD,
+			&I_a, &I_b, &I_c, &I_alpha, &I_beta, &TM_cur, &W_r);
+
+#endif
+
+	// Run Reference Generator
+	RG_Controller(&Reference_Generator, Vd_ref, Vq_ref, Wr_ref,
+			W_r, &Id_ref, &Iq_ref, &W1, &Theta1);
+
+	// Run DQ_transformation algorithm
+	// FIXME - no sensor interfacing yet
+	DQ_Transformation(SV_SCALING_CONST, I_a, I_b, I_c, Theta1, &Id, &Iq);
+
+
+	// Run D-axis control
+	PI_Controller(&PI_Control, Id_ref, Id, Iq, W1, &Vd_ref, D_AXIS_CONTROL);
+
+
+	// Run Q-axis control
+	PI_Controller(&PI_Control, Iq_ref, Iq, Id, W1, &Vq_ref, Q_AXIS_CONTROL);
+
+
+	// Run IDQ_transformation algorithm
+	IDQ_Transformation(SV_SCALING_CONST, Vd_ref, Vq_ref, Theta1,
+			&V_alpha, &V_beta, &V_a, &V_b, &V_c);
+
+	// Run Space-Vector PWM modulation
+	SVPWM_Algorithm(&SV_PWM, V_a, V_b, V_c, &P1_rise, &P1_fall, &P2_rise, &P2_fall,
+				&P3_rise, &P3_fall);
+	
+	// Send Timing information to FPGA
+	if (dsp_data_to_gpmc(P1_rise, P1_fall, P2_rise, P2_fall, P3_rise, P3_fall))
 	{
-		fprintf(stderr, "Unable to open file! \n");
+		fprintf(stderr, "Error with sending PWM timing data to FPGA\n");
 		b_error = 1;
-	} else {
-		fclose(fd);
+	}
+	
+#ifdef _DEBUG
+	// Log output to DEBUG CSV
+	gettimeofday(&tv,NULL);
+	fprintf(fd_csv, "%f,%f,%f,%f,%f,%f,%f,%f,%ld,%ld,%f,%u,%u\n",V_alpha,V_beta,I_alpha,I_beta,W_r,TM_cur,
+			Induction_Motor.psi_a_pre,Induction_Motor.psi_b_pre, tv.tv_sec, tv.tv_usec,
+			V_a, P1_rise, P1_fall);
+
+#endif
+
+
+	return b_error;
+}
+
+
+int dsp_data_to_gpmc(const uint32_t P1_sw_on, const uint32_t P1_sw_off,
+			const uint32_t P2_sw_on, const uint32_t P2_sw_off,
+			const uint32_t P3_sw_on, const uint32_t P3_sw_off)
+{
+	int b_error = 0;		// Error Bit
+	int i = 0;			// Increment loop variable
+
+	struct bridge br;		// Set up communication bridge
+
+	/*
+	 * Setup configuration command bits for FPGA
+	 * From LSB:
+	 * reset, enable, polarity,
+	 */
+	uint16_t setup_conf_L = 0b00000010;
+	uint16_t setup_conf_U = 0x0000;	
+
+	/*
+	 * Store switch on and switch off times
+	 */
+	uint16_t sw_on_UW = (uint16_t)(P1_sw_on >> 16);			// Phase 1 switch on at [ns] Upper
+	uint16_t sw_on_LW = (uint16_t)(P1_sw_on & 0x0000FFFF);		// Phase 1 switch on at [ns] Lower
+	uint16_t sw_off_UW = (uint16_t)(P1_sw_off >> 16);		// Phase 1 switch off at [ns] Upper
+	uint16_t sw_off_LW = (uint16_t)(P1_sw_off & 0x0000FFFF);	// Phase 1 switch off at [ns] Lower
+
+
+	// Command to be sent to the FPGA memory
+	uint16_t P1_data[] = {sw_on_LW, sw_on_UW, sw_off_LW, sw_off_UW, setup_conf_L, setup_conf_U};
+	// Map commands to FPGA register addresses
+	uint16_t reg_addr[] = {SW_ON_REG_L, SW_ON_REG_U, SW_OFF_REG_L, SW_OFF_REG_U, CONFIG_REG_L, CONFIG_REG_U};
+
+	// Initialize communication bridge
+	if (bridge_init(&br, BW_BRIDGE_MEM_ADR, BW_BRIDGE_MEM_SIZE) < 0) 
+	{
+		fprintf(stderr, "Unable to initialize communication bridge! \n");
+		b_error = 1;
+	}
+	
+	//fprintf(stdout, "-----%ui-----%ui\n", P1_sw_on, P1_sw_off);
+	if (!b_error)
+	{
+		while (i < COMMAND_REG_SIZE)
+		{
+			set_fpga_mem(&br, reg_addr[i]*sizeof(uint16_t), &P1_data[i], 1);
+			i++;
+		}
 	}
 
-	// Open file for writing
-	fd = fopen(fileName, "a");
-	if(fd == NULL)
+	// Close communication bridge
+	if (!b_error)
 	{
-		fprintf(stderr, "Unable to open file! \n");
+		bridge_close(&br);
+	}
+
+	return b_error;
+}
+
+
+int main()
+{
+	int b_error = 0;
+
+#ifdef _DEBUG
+	// File name for DEBUG output CSV
+	const char *fileName = "dbg_output.csv";
+
+#endif
+
+	volatile void *gpio_addr = NULL;		// GPIO address pointer
+	volatile unsigned int *gpio_datain = NULL;	// GPIO address to read data
+	
+	// Latch GPIO PIN to detect only once per interrupt in case of fast operation
+	int b_pin_latch = 0;
+
+	// File descriptor for device memory
+	int fd_mem = open("/dev/mem", O_RDWR);
+	if (fd_mem == -1)
+	{
+		fprintf(stderr, "Unable to open device memory module\n");
 		b_error = 1;
 	}
 
-
-	// Induction motor model
-	IM_Typedef Induction_Motor;
-	// Referenge Generator structure
-	RG_Typedef Reference_Generator;
-	// PI controller structure for DQ axis control
-	PI_Typedef PI_Control;
-
-
-	// Initialize alpha/beta voltage, current and torque parameters
-	float V_alpha = 0;
-	float V_beta = 0;
-	float I_alpha = 0;
-	float I_beta = 0;
-	float TM_cur = 0;
-
-	// Initialize phase currents
-	float I_a = 0;
-        float I_b = 0;
-	float I_c = 0;	
-
-	// Initialize phase voltages
-	float V_a = 0;
-	float V_b = 0;
-	float V_c = 0;
-
-	// Initialize Motor Speed
-	float W_r = 0;
-
-	// Initialize reference values for Vd Vq and Wr, overwritten by current controller
-	float Vd_ref = 0;
-	float Vq_ref = 0;
-	float Wr_ref = 0;
-
-	// Initialize reference D-Q currents, rotor position and rotor angular speed
-	float Id_ref = 0;
-	float Iq_ref = 0;
-	float W1 = 0;
-	float Theta1 = 0;
-
-	// Initialize D-Q currents
-	float Id = 0;
-	float Iq = 0;
-
-	// Compute Normalized values
-	Base_Compute(NOMINAL_PHASE_VOLTAGE, NOMINAL_PHASE_CURRENT, POLE_PAIRS,
-			NOMINAL_STATOR_FREQUENCY, SV_SCALING_CONST, NOMINAL_STATOR_RESISTANCE,
-		        NOMINAL_ROTOR_RESISTANCE, NOMINAL_LEAKAGE_INDUCTANCE, NOMINAL_MAGNETIZING_INDUCTANCE,
-		        RISE_TIME_CC, NOMINAL_INERTIA, NOMINAL_DAMPING_CONST,
-			&Stator_Resistance, &Rotor_Resistance, &Leakage_Inductance, &Magnetizing_Inductance,
-			&Mech_Inertia_Const, &Damping_Const, &Voltage_Base, &Voltage_Max,
-			&Voltage_Min, &Angular_Freq_Base, &Max_Current, &Nom_Current, &Min_Current,
-			&Curr_Ctrl_Bandwidth, &Spd_Ctrl_Bandwidth, &Base_Ang_Freq);
-
-	// Initialize Induction motor
-	IM_StructInit(&Induction_Motor, Stator_Resistance, Rotor_Resistance, Leakage_Inductance, 
-			Magnetizing_Inductance,SAMPLING_TIME, POLE_PAIRS, SV_SCALING_CONST,
-			Mech_Inertia_Const,Damping_Const);
-
-	// Initialize Reference generator
-	RG_StructInit(&Reference_Generator, Voltage_Base, RESERVOIR_CONST, Base_Ang_Freq,
-		   	Rotor_Resistance, Leakage_Inductance, Magnetizing_Inductance,
-		    	SAMPLING_TIME, Mech_Inertia_Const,POLE_PAIRS, SV_SCALING_CONST,
-		       	Damping_Const,Spd_Ctrl_Bandwidth, Max_Current, Min_Current, Nom_Current);
-
-	// Initialize PI controller - check KP KI, RACTIVE VMIN and VMAX Parameters
-	PI_StructInit(&PI_Control, Stator_Resistance, Curr_Ctrl_Bandwidth,SAMPLING_TIME,
-		       	Leakage_Inductance, Voltage_Max, Voltage_Min);
-
-	// Iteration variable: number of cycles to run
-	int i = 0;
-	int lim = atoi(argv[1]);
-	while(!b_error) 
+	// Map memory location
+	if (!b_error)
 	{
-
-		// Control loop length for testing
-		if (i == lim) { b_error = 1; break; }
-		i++;
-
-		// Simulate Induction Motor
-		//fprintf(stderr, "IM_model input: V_alpha = %f, V_beta = %f, Torque_Load = %f\n",
-		//	       	V_alpha, V_beta, TORQUE_LOAD);
-		IM_model(&Induction_Motor, V_alpha, V_beta, TORQUE_LOAD,
-				&I_a, &I_b, &I_c, &I_alpha, &I_beta, &TM_cur, &W_r);
-		//fprintf(stderr, "IM_model output: I_a = %f, I_b = %f, I_c = %f, W_r = %f\n\n",
-		//	       	I_a, I_b, I_c, W_r);
-
-		// Run Reference Generator
-		//fprintf(stderr, "RG_control input: Vd_ref = %f, Vq_ref = %f, Wr_ref = %f\n",
-		//	       	Vd_ref, Vq_ref, Wr_ref);
-		RG_Controller(&Reference_Generator, Vd_ref, Vq_ref, Wr_ref,
-			    	W_r, &Id_ref, &Iq_ref, &W1, &Theta1);
-		//fprintf(stderr, "RG_control output: Id_ref = %f, Iq_ref = %f, W1 = %f, Theta1 = %f\n\n",
-		//	       	Id_ref, Iq_ref, W1, Theta1);
+		gpio_addr = mmap(0, GPIO_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, fd_mem, GPIO_START_ADDR);
 		
-		// Run DQ_transformation algorithm
-		//fprintf(stderr, "DQ_transf input: I_a = %f, I_b = %f, I_c = %f, theta1 = %f\n",
-		//		I_a, I_b, I_c, Theta1);
-		DQ_Transformation(SV_SCALING_CONST, I_a, I_b, I_c, Theta1, &Id, &Iq);
-		//fprintf(stderr, "DQ_transf output: Id = %f, I_q = %f\n\n",
-		//		Id, Iq);
-
-		// Run D-axis control
-		//fprintf(stderr, "D-axis Control Input: I_ref(d) = %f, Iprim(d) = %f, Isec(q) = %f, w1 = %f\n",
-		//		Id_ref, Id, Iq, W1);
-		PI_Controller(&PI_Control, Id_ref, Id, Iq, W1, &Vd_ref, D_AXIS_CONTROL);
-		//fprintf(stderr, "D-axis Control Output: Vd_ref = %f\n", 
-		//		Vd_ref);	
-
-		// Run Q-axis control
-		//fprintf(stderr, "Q-axis Control Input: I_ref(q) = %f, Iprim(q) = %f, Isec(d) = %f, w1 = %f\n",
-		//		Iq_ref, Iq, Id, W1);
-		PI_Controller(&PI_Control, Iq_ref, Iq, Id, W1, &Vq_ref, Q_AXIS_CONTROL);
-		//fprintf(stderr, "Q-axis Control Output: Vq_ref = %f\n\n", 
-		//		Vq_ref);
-
-		// Run IDQ_transformation algorithm
-		//fprintf(stderr, "IDQ_transf input: Vd = %f, Vq = %f, theta1 = %f\n",
-		//		Vd_ref, Vq_ref, Theta1);
-		IDQ_Transformation(SV_SCALING_CONST, Vd_ref, Vq_ref, Theta1,
-					&V_alpha, &V_beta, &V_a, &V_b, &V_c);
-		//fprintf(stderr, "IDQ_transf output: Valpha = %f, Vbeta = %f, Va = %f, Vb = %f, Vc = %f\n\n",
-		//		V_alpha, V_beta, V_a, V_b, V_c);
-
-		//fprintf(stderr, "=========================================================================\n\n");
-
-
-		gettimeofday(&tv,NULL);
-   		fprintf(fd, "%f,%f,%f,%f,%f,%f,%f,%f,%ld,%ld\n",V_alpha,V_beta,I_alpha,I_beta,W_r,TM_cur,
-				Induction_Motor.psi_a_pre,Induction_Motor.psi_b_pre, tv.tv_sec, tv.tv_usec);
-
+		if (gpio_addr == MAP_FAILED)
+		{
+			fprintf(stderr, "Unable to map GPIO to memory\n");
+			b_error = 1;
+		} else  {
+			gpio_datain = gpio_addr + GPIO_DATAIN;
+		}
 	}
 
-	if (fd) 
+#ifdef _DEBUG
+	// Open DEBUG file for output
+	if (!b_error)
 	{
-		fclose(fd);
+		// Clear content of file first, then open again for writing
+		fd_csv = fopen(fileName, "w");
+
+		if(fd_csv == NULL)
+		{
+			fprintf(stderr, "Unable to open file! \n");
+			b_error = 1;
+		} else {
+			fclose(fd_csv);
+		}
+
+		// Open file again for logging output
+		fd_csv = fopen(fileName, "a");
+		if(fd_csv == NULL)
+		{
+			fprintf(stderr, "Unable to open file! \n");
+			b_error = 1;
+		} else {
+			fprintf(stdout, "Starting application in debug mode, logging output to %s\n",
+					fileName);
+		}
 	}
-	return -1;
+
+#endif
+
+	/*
+	 * Compute normalized values of motor parameters
+	 * Initialize induction motor model
+	 * Initialize reference generator
+	 * Initialize PI controller
+	 * Initialize SV-PWM
+	 */
+	if (!b_error)
+	{
+		Base_Compute(NOMINAL_PHASE_VOLTAGE, NOMINAL_PHASE_CURRENT, POLE_PAIRS,
+				NOMINAL_STATOR_FREQUENCY, SV_SCALING_CONST, NOMINAL_STATOR_RESISTANCE,
+				NOMINAL_ROTOR_RESISTANCE, NOMINAL_LEAKAGE_INDUCTANCE, NOMINAL_MAGNETIZING_INDUCTANCE,
+				RISE_TIME_CC, NOMINAL_INERTIA, NOMINAL_DAMPING_CONST,
+				&Stator_Resistance, &Rotor_Resistance, &Leakage_Inductance, &Magnetizing_Inductance,
+				&Mech_Inertia_Const, &Damping_Const, &Voltage_Base, &Voltage_Max,
+				&Voltage_Min, &Angular_Freq_Base, &Max_Current, &Nom_Current, &Min_Current,
+				&Curr_Ctrl_Bandwidth, &Spd_Ctrl_Bandwidth, &Base_Ang_Freq);
+
+		IM_StructInit(&Induction_Motor, Stator_Resistance, Rotor_Resistance, Leakage_Inductance, 
+				Magnetizing_Inductance,SAMPLING_TIME, POLE_PAIRS, SV_SCALING_CONST,
+				Mech_Inertia_Const,Damping_Const);
+
+		RG_StructInit(&Reference_Generator, Voltage_Base, RESERVOIR_CONST, Base_Ang_Freq,
+				Rotor_Resistance, Leakage_Inductance, Magnetizing_Inductance,
+				SAMPLING_TIME, Mech_Inertia_Const,POLE_PAIRS, SV_SCALING_CONST,
+				Damping_Const,Spd_Ctrl_Bandwidth, Max_Current, Min_Current, Nom_Current);
+
+		PI_StructInit(&PI_Control, Stator_Resistance, Curr_Ctrl_Bandwidth,SAMPLING_TIME,
+				Leakage_Inductance, Voltage_Max, Voltage_Min);
+		// FIXME - VDC not sensor input
+		SVPWM_StructInit(&SV_PWM, SAMPLING_TIME, VDC, TIME_OFFSET_FACTOR);
+	}
+
+
+	// Wait for signal from the FPGA
+	if (!b_error)
+	{
+		while(1)
+		{
+			if ((*gpio_datain & GPIO_PIN) && !b_pin_latch)
+			{
+				b_pin_latch = 1;
+				if (control_loop())
+				{
+					fprintf(stderr, "Error in control loop, breaking sequence, shutting down!\n");
+					b_error = 1;
+					break;
+				}
+			} else {
+				b_pin_latch = 0;
+			}
+		}
+	} else {
+		fprintf(stderr, "Error during initialization, shutting down \n");
+	}
+
+	// Close all files and unmap memory segment
+	if (fd_mem)
+	{	
+		close(fd_mem);
+	}
+
+	if (gpio_addr)
+	{
+		munmap((void*)gpio_addr, GPIO_SIZE);
+	}
+
+#ifdef _DEBUG
+	if (fd_csv) 
+	{
+		fclose(fd_csv);
+	}
+#endif
+
+	return b_error;
 }

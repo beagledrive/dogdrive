@@ -11,6 +11,12 @@ INCLUDES = ./header
 # -Wall compiler warnings
 CC = gcc
 CFLAGS = -g -Wall -I$(INCLUDES) -lm -Werror
+ifeq ($(CFG),debug)
+CFLAGS += -D_DEBUG
+else
+CFLAGS += -O2
+endif
+
 
 # dependencies
 SRCS = $(wildcard $(SRC_DIR)/*.c)

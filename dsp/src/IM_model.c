@@ -50,8 +50,6 @@ void IM_model(IM_Typedef *IM_Struct,float Valpha,float Vbeta,float TL,
 {
 
     // Parameters for inverse T-equivalent circuit for induction motor
-    float Ls = 0;
-    float Lr = 0;
     float R_S = 0;
     float R_R = 0;
     float L_M = 0;
@@ -91,12 +89,10 @@ void IM_model(IM_Typedef *IM_Struct,float Valpha,float Vbeta,float TL,
     TL_cur = TL;
 
     // Parameters for inverse T-equivalent circuit for the induction motor
-    Ls = IM_Struct->Lm + 0.5*IM_Struct->Ll;
-    Lr = IM_Struct->Lm + 0.5*IM_Struct->Ll;
     R_S = IM_Struct->Rs;
-    R_R = ((IM_Struct->Lm*IM_Struct->Lm)/(Lr*Lr))*IM_Struct->Rr;
-    L_M = IM_Struct->Lm*IM_Struct->Lm/Lr;
-    L_sigma = Ls - L_M;
+    R_R = IM_Struct->Rr;
+    L_M = IM_Struct->Lm;
+    L_sigma = IM_Struct->Ll;
 
     // Current dynamics for inverse T-equivalent circuit for the induction motor
     A = 1 + (IM_Struct->Ts/L_sigma)*(R_S + R_R);

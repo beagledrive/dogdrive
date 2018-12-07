@@ -6,38 +6,15 @@
 
 /* ================================== INCLUDES ============================== */
 
-#include <stdio.h>
-#include <stdlib.h>
-
+#include <svpwm.h>
 
 /* ================================== MACROS ================================ */
 
 
 /* ================================== TYPEDEFS ============================== */
 
-typedef struct
-{
-    float Ts;                  // Sampling time
-    float Udc;                 // DC-link voltage
-    float a;                   // Time-offset factor
-
-} SVPWM_Typedef;
-
 
 /* ================================== FUNCTION PROTOTYPES =================== */
-
-/*
- * Initialize SV-PWM structure
- */
-void SVPWM_StructInit(SVPWM_Typedef *SVPWM_Struct,float SampTime, float DClinkVolt,
-			float TimeOffsetFact);
-
-/*
- * SV-PWM generation function
- */
-void SVPWM_Algorithm(SVPWM_Typedef *SVPWM_Struct,float Ua_ref,float Ub_ref,float Uc_ref,
-			float *Ta_rise,float *Ta_fall,float *Tb_rise,float *Tb_fall,
-			float *Tc_rise,float *Tc_fall);
 
 
 /* ================================== INTERNAL GLOBALS ====================== */
@@ -55,8 +32,8 @@ void SVPWM_StructInit(SVPWM_Typedef *SVPWM_Struct,float SampTime,float DClinkVol
 }
 
 void SVPWM_Algorithm(SVPWM_Typedef *SVPWM_Struct,float Ua_ref,float Ub_ref,float Uc_ref,
-			float *Ta_rise,float *Ta_fall,float *Tb_rise,float *Tb_fall,
-			float *Tc_rise,float *Tc_fall)
+			uint32_t *Ta_rise,uint32_t *Ta_fall,uint32_t *Tb_rise,uint32_t *Tb_fall,
+			uint32_t *Tc_rise, uint32_t *Tc_fall)
 {
     float Tas = 0;
     float Tbs = 0;
@@ -93,7 +70,6 @@ void SVPWM_Algorithm(SVPWM_Typedef *SVPWM_Struct,float Ua_ref,float Ub_ref,float
 
     if(Tmax < Tbs)
     {
-        Tmax = Tbs;
     }
 
     if(Tmax < Tcs)
@@ -113,15 +89,18 @@ void SVPWM_Algorithm(SVPWM_Typedef *SVPWM_Struct,float Ua_ref,float Ub_ref,float
     Tgb = Tbs + Toffset;
     Tgc = Tcs + Toffset;
 
+
     // Computing rising edge and falling edge of the PWM
-    *Ta_rise = (SVPWM_Struct->Ts/2)-(Tga/2);
-    *Ta_fall = (SVPWM_Struct->Ts/2)+(Tga/2);
+    // FIXME - Handle unexpected error case when cal. times are negative
+    // FIXME - Handle units
+    *Ta_rise = (uint32_t)(((SVPWM_Struct->Ts/2)-(Tga/2))*1000000000/5);
+    *Ta_fall = (uint32_t)(((SVPWM_Struct->Ts/2)+(Tga/2))*1000000000/5);
 
-    *Tb_rise = (SVPWM_Struct->Ts/2)-(Tgb/2);
-    *Tb_fall = (SVPWM_Struct->Ts/2)+(Tgb/2);
+    *Tb_rise = (uint32_t)((SVPWM_Struct->Ts/2)-(Tgb/2));
+    *Tb_fall = (uint32_t)((SVPWM_Struct->Ts/2)+(Tgb/2));
 
-    *Tc_rise = (SVPWM_Struct->Ts/2)-(Tgc/2);
-    *Tc_fall = (SVPWM_Struct->Ts/2)+(Tgc/2);
+    *Tc_rise = (uint32_t)((SVPWM_Struct->Ts/2)-(Tgc/2));
+    *Tc_fall = (uint32_t)((SVPWM_Struct->Ts/2)+(Tgc/2));
 
 }
 
