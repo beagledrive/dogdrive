@@ -23,22 +23,19 @@
 int write_dsp_data();
 uint32_t sw_on = 0;
 uint32_t sw_off = 15000;
-
+struct bridge br;
 
 int write_dsp_data()
 {
-	unsigned int b_error = 0;
+	unsigned int b_error = 1;
 
 
-	struct bridge br;
 	//uint16_t src = 0xFFFF;
 	//uint16_t dest = 0;
 
-	// PWM headers
-	// reset 0, enable 1, polarity 0
-	uint16_t setupLW = 0b00001010;
+
 	//uint16_t setupUW = 0b00000000;
-	
+	uint16_t dsp_err = 0;
 
 	//	uint32_t sw_on = 5000; //clock
 	sw_off = 15000; 
@@ -63,18 +60,15 @@ int write_dsp_data()
 	uint16_t dutyUW = 0x0830; //(uint16_t) duty >> 16; //ns
 	*/
 
-	uint16_t data[] = {periodLW, periodUW, dutyLW, dutyUW, setupLW};
-	int regAddr [] = {2,1,4,3, 0};
-	if (bridge_init(&br, BW_BRIDGE_MEM_ADR, BW_BRIDGE_MEM_SIZE) < 0)
-	{
-		b_error = 1;
-	}
+	uint16_t data[] = {periodLW, periodUW, dutyLW, dutyUW};
+	int regAddr [] = {2,3,4,5};
 
+
+	set_fpga_mem(&br, (uint16_t) 1*sizeof(uint16_t), &dsp_err, 1);
 
 	//printf("Memory Address: 0x%X\n", BW_BRIDGE_MEM_ADR);
 
 	unsigned int i = 0;	
-
 	printf("Data Write:---------------------------- \n");	
 	while(i < sizeof(data)/sizeof(uint16_t))
 	{
@@ -96,9 +90,8 @@ int write_dsp_data()
 		i++;
 	}
 	
-	bridge_close(&br);
-
 	printf("--------------------------------------- \n");
+	b_error = 0;
 	return b_error;
 }
 
@@ -141,26 +134,46 @@ int main()
 	*gpio_oe_addr = reg;
 	printf("GPIO configuration: %X\n", reg);
 */
-	printf("Wait for GPIO Signal\n");
-	while(1)
+	int bridge_error = 0;
+	if (bridge_init(&br, BW_BRIDGE_MEM_ADR, BW_BRIDGE_MEM_SIZE) < 0)
 	{
-		if (*gpio_datain & PIN && !latch)
+		bridge_error = 1;
+	}
+	if (!bridge_error) 
+	{
+
+		// Enable PWM
+		// reset 0, enable 1, polarity 0
+		printf("Enable PWM\n");
+		uint16_t setupLW = 0b00000111;
+		set_fpga_mem(&br, (uint16_t) 0*sizeof(uint16_t), &setupLW, 1);
+
+		printf("Wait for GPIO Signal\n");
+		while(1)
 		{
-			latch = 1;
-			if (write_dsp_data())
+			if (*gpio_datain & PIN && !latch)
 			{
-				printf("ERRRR\n");
-				break;
+				latch = 1;
+				if (write_dsp_data())
+				{
+					printf("ERRRR\n");
+					break;
+				}
+			} else
+			{
+				latch = 0;
 			}
-		} else
-		{
-			latch = 0;
 		}
+	}else{
+		printf("Bridge failed to open");
 	}
 
+	bridge_close(&br);
 	munmap((void*)gpio_addr, GPIO_SIZE);
 	close(fd);
 	return 0;
+
+
 
 
 

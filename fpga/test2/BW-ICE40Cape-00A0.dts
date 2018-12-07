@@ -185,11 +185,13 @@
 	fragment@3 {
 		target = <&ocp>;
 		__overlay__ {
-			pinctrl-names = "default";
-			pinctrl-0 = <&bw_irq_pins>;
-			status = "okay";
+			test_helper: helper{
+				compatible = "bone-pinmux-helper";
+				pinctrl-names = "default";
+				pinctrl-0 = <&bw_irq_pins>;
+				status = "okay";
+			};
 		};
 			
 	};
-
 };

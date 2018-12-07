@@ -438,7 +438,6 @@ int main()
 		SVPWM_StructInit(&SV_PWM, SAMPLING_TIME, VDC, TIME_OFFSET_FACTOR);
 	}
 
-
 	// Wait for signal from the FPGA
 	if (!b_error)
 	{
