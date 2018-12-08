@@ -10,6 +10,8 @@
 #include <stdlib.h>
 #include <sys/time.h>
 #include <sys/stat.h>
+#include <string.h>
+#include <signal.h>
 
 #include <IM_model.h>
 #include <Reference_generator.h>
@@ -26,30 +28,33 @@
  * Motor Parameters
  * Later with HMI, should be made customizable through interface
  */
-#define NOMINAL_PHASE_VOLTAGE		(float)127	// [Volta]
-#define NOMINAL_PHASE_CURRENT		(float)7.8	// [A]
+#define NOMINAL_PHASE_VOLTAGE		(float)127		// [Volta]
+#define NOMINAL_PHASE_CURRENT		(float)7.8		// [A]
 #define POLE_PAIRS			(float)2	
-#define NOMINAL_STATOR_FREQUENCY	(float)50	// [Hz]
+#define NOMINAL_STATOR_FREQUENCY	(float)50		// [Hz]
 #define SV_SCALING_CONST		(float)0.707
-#define NOMINAL_STATOR_RESISTANCE	(float)0.77	// [Ohm]
-#define NOMINAL_ROTOR_RESISTANCE	(float)1.03	// [Ohm]
-#define NOMINAL_LEAKAGE_INDUCTANCE	(float)0.0095	// [H]
-#define NOMINAL_MAGNETIZING_INDUCTANCE	(float)0.066	// [H]
-#define RISE_TIME_CC			(float)0.001	// [s]
+#define NOMINAL_STATOR_RESISTANCE	(float)0.77		// [Ohm]
+#define NOMINAL_ROTOR_RESISTANCE	(float)1.03		// [Ohm]
+#define NOMINAL_LEAKAGE_INDUCTANCE	(float)0.0095		// [H]
+#define NOMINAL_MAGNETIZING_INDUCTANCE	(float)0.066		// [H]
+#define RISE_TIME_CC			(float)0.001		// [s]
 #define NOMINAL_INERTIA			(float)0.0192
 #define NOMINAL_DAMPING_CONST		(float)0.0024
-#define SAMPLING_TIME			(float)0.0001	// [s]
+#define SAMPLING_TIME			(float)0.0314		// [p.u.]
+#define SAMPLING_TIME_SEC		(float)0.0001			// [s]
+#define SWITCHING_FREQUENCY		(float)(1/SAMPLING_TIME_SEC)	// [Hz]
 #define RESERVOIR_CONST			(float)0.95
 #define TIME_OFFSET_FACTOR		(float)0.5
 
-// fix this to be sensor input
-#define VDC				(float)760
+// FIXME - fix this to be sensor input
+#define VDC				(float)1.05
 
 
 /*
  * Torque Load in pu
  */
-#define TORQUE_LOAD			(float)0.6	// [p.u.]
+#define TORQUE_LOAD			(float)0.6489		// [p.u.]
+#define MOTOR_REF_SPEED			(float)0.9333		// [p.u.]
 
 /*
  * Define D-Q Transformation flags
@@ -69,7 +74,7 @@
 #define GPIO_END_ADDR			0x4804DFFF
 #define GPIO_SIZE 			(GPIO_END_ADDR - GPIO_START_ADDR)
 #define GPIO_DATAIN			0x138
-#define GPIO_PIN 			(1 << 17)	// PIN 17 on BB for interrupt
+#define GPIO_PIN 			(1 << 17)		// PIN 17 on BB for interrupt
 
 /*
  * Register location of commands to FPGA
@@ -102,6 +107,11 @@ int dsp_data_to_gpmc(const uint32_t P1_sw_on, const uint32_t P1_sw_off,
  */
 int control_loop();
 
+/*
+ * Manual interrupt handler function
+ */
+void int_handler();
+
 
 /* ================================== INTERNAL GLOBALS ====================== */
 
@@ -118,7 +128,6 @@ static float Damping_Const = 0;
 static float Voltage_Base = 0;
 static float Voltage_Max = 0;
 static float Voltage_Min = 0;
-static float Angular_Freq_Base = 0;
 static float Max_Current = 0;
 static float Nom_Current = 0;
 static float Min_Current = 0;
@@ -133,7 +142,7 @@ static float Base_Ang_Freq = 0;
  * Phase currents
  * Phase Voltages
  * Motor Speed
- * Reference D-Q voltages and motor speed
+ * Reference D-Q voltages
  * Reference D-Q currents
  * Rotor Position and angular speed
  * D-Q Currents
@@ -161,7 +170,6 @@ static float W_r = 0;
 
 static float Vd_ref = 0;
 static float Vq_ref = 0;
-static float Wr_ref = 0;
 
 static float Id_ref = 0;
 static float Iq_ref = 0;
@@ -215,18 +223,25 @@ static uint32_t P3_rise;
 static uint32_t P3_fall;
 /*********************************/
 
+/*
+ * Handle manual interrupt signal
+ */
+volatile int man_interrupt = 0;
+
 
 /* ================================== FUNCTION DEFINITIONS ================== */
 
+
+void int_handler()
+{
+	man_interrupt = 1;
+}
 
 int control_loop()
 {
 	int b_error = 0;		// Error bit for possible future error handling
 
 #ifdef _DEBUG
-
-	// Get TimeStamp for debug output
-	struct timeval tv;
 
 	// Simulate Induction Motor
 	IM_model(&Induction_Motor, V_alpha, V_beta, TORQUE_LOAD,
@@ -235,7 +250,7 @@ int control_loop()
 #endif
 
 	// Run Reference Generator
-	RG_Controller(&Reference_Generator, Vd_ref, Vq_ref, Wr_ref,
+	RG_Controller(&Reference_Generator, Vd_ref, Vq_ref, MOTOR_REF_SPEED,
 			W_r, &Id_ref, &Iq_ref, &W1, &Theta1);
 
 	// Run DQ_transformation algorithm
@@ -266,16 +281,6 @@ int control_loop()
 		b_error = 1;
 	}
 	
-#ifdef _DEBUG
-	// Log output to DEBUG CSV
-	gettimeofday(&tv,NULL);
-	fprintf(fd_csv, "%f,%f,%f,%f,%f,%f,%f,%f,%ld,%ld,%f,%u,%u\n",V_alpha,V_beta,I_alpha,I_beta,W_r,TM_cur,
-			Induction_Motor.psi_a_pre,Induction_Motor.psi_b_pre, tv.tv_sec, tv.tv_usec,
-			V_a, P1_rise, P1_fall);
-
-#endif
-
-
 	return b_error;
 }
 
@@ -345,11 +350,43 @@ int main()
 #ifdef _DEBUG
 	// File name for DEBUG output CSV
 	const char *fileName = "dbg_output.csv";
+	// To get current time
+	struct timeval tv;
+
+	char query[5] = "null";
+	int b_log_enable = 0;
+	int log_freq = 0;
+	int log_counter_lim = 0;
+	int log_counter = 0;
+
+	fprintf(stdout, "Would you like to log data output to csv file? (y/n)\n");
+
+	//while ((0 != strcmp(query, "y")) && (0 != strcmp(query, "n"))) 
+	while(1)
+	{
+		scanf("%s", query);
+		if (!strcmp(query, "y")) 
+		{
+			b_log_enable = 1;
+			fprintf(stdout, "Set frequency of data logging (integer # of logs/second):\n");
+			scanf("%d", &log_freq);
+			fprintf(stdout, "Logging frequency set to: %d/sec\n", log_freq);
+			log_counter_lim = (int)(SWITCHING_FREQUENCY/log_freq);
+			break;
+		} else if (!strcmp(query, "n")) {
+			fprintf(stdout, "Continuing without logging data \n");
+			break;
+		} else {
+			fprintf(stderr, "Invalid input \n");
+		}
+
+	}
 
 #endif
 
 	volatile void *gpio_addr = NULL;		// GPIO address pointer
 	volatile unsigned int *gpio_datain = NULL;	// GPIO address to read data
+
 	
 	// Latch GPIO PIN to detect only once per interrupt in case of fast operation
 	int b_pin_latch = 0;
@@ -378,7 +415,7 @@ int main()
 
 #ifdef _DEBUG
 	// Open DEBUG file for output
-	if (!b_error)
+	if (!b_error && b_log_enable)
 	{
 		// Clear content of file first, then open again for writing
 		fd_csv = fopen(fileName, "w");
@@ -405,6 +442,13 @@ int main()
 
 #endif
 
+
+	// Catch manual interrupt Ctrl-C
+	if (!b_error)
+	{
+		signal(SIGINT, &int_handler);
+	}
+
 	/*
 	 * Compute normalized values of motor parameters
 	 * Initialize induction motor model
@@ -420,7 +464,7 @@ int main()
 				RISE_TIME_CC, NOMINAL_INERTIA, NOMINAL_DAMPING_CONST,
 				&Stator_Resistance, &Rotor_Resistance, &Leakage_Inductance, &Magnetizing_Inductance,
 				&Mech_Inertia_Const, &Damping_Const, &Voltage_Base, &Voltage_Max,
-				&Voltage_Min, &Angular_Freq_Base, &Max_Current, &Nom_Current, &Min_Current,
+				&Voltage_Min, &Max_Current, &Nom_Current, &Min_Current,
 				&Curr_Ctrl_Bandwidth, &Spd_Ctrl_Bandwidth, &Base_Ang_Freq);
 
 		IM_StructInit(&Induction_Motor, Stator_Resistance, Rotor_Resistance, Leakage_Inductance, 
@@ -441,7 +485,7 @@ int main()
 	// Wait for signal from the FPGA
 	if (!b_error)
 	{
-		while(1)
+		while(!man_interrupt)
 		{
 			if ((*gpio_datain & GPIO_PIN) && !b_pin_latch)
 			{
@@ -452,10 +496,30 @@ int main()
 					b_error = 1;
 					break;
 				}
+#ifdef _DEBUG
+				if (b_log_enable) {
+					if (log_counter == log_counter_lim)
+					{
+						// Log output to DEBUG CSV
+						gettimeofday(&tv,NULL);
+						fprintf(fd_csv, "%f,%f,%f,%f,%f,%f,%f,%f,%ld,%ld,%f,%u,%u\n",V_alpha,V_beta,I_alpha,I_beta,W_r,TM_cur,
+								Induction_Motor.psi_a_pre,Induction_Motor.psi_b_pre, tv.tv_sec, tv.tv_usec,
+								V_a, P1_rise, P1_fall);
+						log_counter = 0;
+					}
+					log_counter++;
+				}
+
+#endif
+
+
 			} else {
 				b_pin_latch = 0;
 			}
 		}
+
+		fprintf(stdout, " --- Program interrupted, shutting down\n");
+
 	} else {
 		fprintf(stderr, "Error during initialization, shutting down \n");
 	}

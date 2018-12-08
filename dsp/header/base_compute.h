@@ -26,7 +26,7 @@ void Base_Compute(float NOMINAL_PHASE_VOLTAGE,float NOMINAL_PHASE_CURRENT,
                   float *LEAKAGE_INDUCTANCE, float *MAGNETIZING_INDUCTANCE,
 		  float *MECH_INERTIA_CONST, float *DAMPING_CONST,
                   float *VOLTAGE_BASE, float *VOLTAGE_MAX, float *VOLTAGE_MIN,
-		  float *ANGULAR_FREQ_BASE, float *MAX_CURRENT,
+		  float *MAX_CURRENT,
                   float *NOM_CURRENT, float *MIN_CURRENT, float *CURR_CTRL_BANDWIDTH,
 		  float *SPD_CTRL_BANDWIDTH, float *BASE_ANGULAR_FREQUENCY);
 

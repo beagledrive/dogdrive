@@ -98,11 +98,11 @@ void IM_model(IM_Typedef *IM_Struct,float Valpha,float Vbeta,float TL,
     A = 1 + (IM_Struct->Ts/L_sigma)*(R_S + R_R);
 
     Ialpha_cur = (1/A)*(Ialpha_pre + (IM_Struct->Ts/L_sigma)*Valpha_cur 
-		    + ((IM_Struct->Ts*R_R)/(L_sigma*L_M))*psi_beta_pre 
+		    + ((IM_Struct->Ts*R_R)/(L_sigma*L_M))*psi_alpha_pre 
 		    + (IM_Struct->Ts*Wr_pre/L_sigma)*psi_beta_pre);
 
     Ibeta_cur = (1/A)*(Ibeta_pre + (IM_Struct->Ts/L_sigma)*Vbeta_cur 
-		    + ((IM_Struct->Ts*R_R)/(L_sigma*L_M))*psi_alpha_pre 
+		    + ((IM_Struct->Ts*R_R)/(L_sigma*L_M))*psi_beta_pre 
 		    - (IM_Struct->Ts*Wr_pre/L_sigma)*psi_alpha_pre);
 
     // Flux dynamics for inverse T-equivalent circuit for the induction motor
