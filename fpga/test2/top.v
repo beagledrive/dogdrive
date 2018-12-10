@@ -24,7 +24,7 @@ reg we;
 reg cs;
 
 // Countermax = 2s with 200M clk
-reg [24:0] counter=0;
+reg [14:0] counter=0;
 
 wire[ADDR_WIDTH-1:0]  addr;
 reg [DATA_WIDTH-1:0]  data_out;
@@ -33,10 +33,10 @@ wire [DATA_WIDTH-1:0]  data_in;
 // set period to PWM period
 //parameter PERIOD = 1/10000;
 parameter PERIOD_FPGA = 5;
-parameter PERIOD_CLK = 50000; //PERIOD*1000000000/PERIOD_FPGA;  // 10kHz period with 200MHz clock is 20000 cycles
-parameter IRQ_PERIOD = 500;  
+parameter PERIOD_CLK = 10000; //PERIOD*1000000000/PERIOD_FPGA;  // 10kHz period with 200MHz clock is 20000 cycles
+parameter IRQ_PERIOD = 50;  
 parameter IRQ_TRIGGER = 0; // IRQ start
-parameter DVALID_TRIGGER = 50; // Time before end period when valid data required
+parameter DVALID_TRIGGER = 500; // Time before end period when valid data required
 
 
 wire [15:0] sw_on_mem;
@@ -82,10 +82,11 @@ begin
 	end
 	if (pwm_en && !pwm_re && pwm_fpga_en_latch) begin
 		pwm_fpga_en <= 1'b1;
+		data_valid <= 1'b1;
 		data_valid_curr <= data_valid_mem;
-		data_valid_prev <= data_valid_mem+1'b1;
-		pwm_fpga_en_latch <= 0;
+		data_valid_prev <= data_valid_mem + 1'b1;
 	end
+	
 	// IRQ occurs at start period - could change to before start
 	if (counter == IRQ_TRIGGER) begin
 		irq_signal <= 1;
@@ -113,25 +114,26 @@ begin
 	end
 
 	// Remove if breaks
-	if ((data_valid_curr != data_valid_prev)) begin
+	if (data_valid_curr != data_valid_prev) begin
 		data_valid <= 1'b1;
 	end else begin
 		data_valid <= 1'b0;
 	end
 
 	// At end of period set the next switches to the current 
-	if ((counter == PERIOD_CLK)) begin 
+	if (counter == PERIOD_CLK && data_valid && pwm_fpga_en && pwm_en) begin 
 		sw_on_curr <= sw_on_next;
 		sw_off_curr <= sw_off_next;
-		data_valid_prev <= data_valid_curr;	
+		data_valid_prev <= data_valid_curr;
+		pwm_fpga_en_latch <= 1'b0;
 	end
-/*
-	if ((counter == PERIOD_CLK) && !data_valid) begin
+
+	if (counter == PERIOD_CLK && !data_valid && !pwm_fpga_en_latch) begin
 		sw_on_curr <= 0;
 		sw_off_curr <= 0;
 		pwm_fpga_en <= 0;
 	end	
-*/	// Reset or increment counter
+	// Reset or increment counter
 	if (counter == PERIOD_CLK) begin
 		counter <= 0;
 	end else begin
@@ -193,7 +195,7 @@ initial begin
 //	mem[4] = 0;
 //	mem[5] = 0;
 
-	pwm_fpga_en = 0;
+	pwm_fpga_en = 1;
 	sw_on_curr = 0;
 	sw_off_curr = 0;
 	counter = 0;
