@@ -21,9 +21,10 @@
 #define PIN (1 << 17)	
 
 int write_dsp_data();
-uint32_t sw_on = 0;
-uint32_t sw_off = 15000;
+uint16_t sw_on = 0;
+uint16_t sw_off = 7500;
 struct bridge br;
+uint16_t setupLW;
 
 int write_dsp_data()
 {
@@ -38,18 +39,18 @@ int write_dsp_data()
 	uint16_t dsp_err = 0;
 
 	//	uint32_t sw_on = 5000; //clock
-	sw_off = 15000; 
-	if(sw_on < sw_off){
-		sw_on ++;
+	sw_off = 7500; 
+	if(sw_on == 0){
+		sw_on = 8000;
 	} else{
 		sw_on = 0;
 	}
+	
+	setupLW = (uint16_t) ((setupLW + 0b00001000)& 0x000F);
 
-
-
-	uint16_t periodUW = (uint16_t) (sw_on >> 16); //ns
+//	uint16_t periodUW = (uint16_t) (sw_on >> 16); //ns
 	uint16_t periodLW = (uint16_t) (sw_on & 0x0000FFFF); 
-	uint16_t dutyUW = (uint16_t) (sw_off >> 16); //ns
+//	uint16_t dutyUW = (uint16_t) (sw_off >> 16); //ns
 	uint16_t dutyLW = (uint16_t) (sw_off & 0x0000FFFF);
 
 	/*	
@@ -60,8 +61,8 @@ int write_dsp_data()
 	uint16_t dutyUW = 0x0830; //(uint16_t) duty >> 16; //ns
 	*/
 
-	uint16_t data[] = {periodLW, periodUW, dutyLW, dutyUW};
-	int regAddr [] = {2,3,4,5};
+	uint16_t data[] = {periodLW, dutyLW, setupLW};
+	int regAddr [] = {2,3,0};
 
 
 	set_fpga_mem(&br, (uint16_t) 1*sizeof(uint16_t), &dsp_err, 1);
@@ -69,29 +70,29 @@ int write_dsp_data()
 	//printf("Memory Address: 0x%X\n", BW_BRIDGE_MEM_ADR);
 
 	unsigned int i = 0;	
-	printf("Data Write:---------------------------- \n");	
+//	printf("Data Write:---------------------------- \n");	
 	while(i < sizeof(data)/sizeof(uint16_t))
 	{
-		printf("Index: %X Written: %X \n", regAddr[i], data[i]);
+//		printf("Index: %X Written: %X \n", regAddr[i], data[i]);
 		set_fpga_mem(&br, (uint16_t) regAddr[i]*sizeof(uint16_t), &data[i], 1);
 		i++;	
-		//printf("Data: 0x%X\n", dest);
+//		printf("Data: 0x%X\n", dest);
 		//src++;
 	}
 	
-	
+/*	int regRetAddr [] = {4,5,6};
 	uint16_t retrieveData;
 	i = 0;
-	printf("Data Read:----------------------------- \n");	
+//	printf("Data Read:----------------------------- \n");	
 	while (i <  sizeof(data)/sizeof(uint16_t))
 	{
-		get_fpga_mem(&br, (uint16_t) regAddr[i]*sizeof(uint16_t), &retrieveData, 1);
-		printf("Index: %X  Retrieved: 0x%X \n", regAddr[i], retrieveData);
+		get_fpga_mem(&br, (uint16_t) regRetAddr[i]*sizeof(uint16_t), &retrieveData, 1);
+//		printf("Index: %X  Retrieved: 0x%X \n", regRetAddr[i], retrieveData);
 		i++;
 	}
 	
-	printf("--------------------------------------- \n");
-	b_error = 0;
+//	printf("--------------------------------------- \n");
+*/	b_error = 0;
 	return b_error;
 }
 
@@ -145,10 +146,11 @@ int main()
 		// Enable PWM
 		// reset 0, enable 1, polarity 0
 		printf("Enable PWM\n");
-		uint16_t setupLW = 0b00000111;
+		setupLW = 0b00001011;
 		set_fpga_mem(&br, (uint16_t) 0*sizeof(uint16_t), &setupLW, 1);
-
-		printf("Wait for GPIO Signal\n");
+//		setupLW = 0b00000010;
+//		set_fpga_mem(&br, (uint16_t) 0*sizeof(uint16_t), &setupLW, 1);
+//		printf("Wait for GPIO Signal\n");
 		while(1)
 		{
 			if (*gpio_datain & PIN && !latch)
