@@ -68,8 +68,11 @@ void SVPWM_Algorithm(SVPWM_Typedef *SVPWM_Struct,float Ua_ref,float Ub_ref,float
     // Computing maximum time
     Tmax = Tas;
 
+    // Fixing needed
+
     if(Tmax < Tbs)
     {
+	Tmax = Tbs;
     }
 
     if(Tmax < Tcs)

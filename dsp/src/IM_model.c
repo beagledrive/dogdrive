@@ -97,8 +97,8 @@ void IM_model(IM_Typedef *IM_Struct,float Valpha,float Vbeta,float TL,
     // Current dynamics for inverse T-equivalent circuit for the induction motor
     A = 1 + (IM_Struct->Ts/L_sigma)*(R_S + R_R);
 
-    Ialpha_cur = (1/A)*(Ialpha_pre + (IM_Struct->Ts/L_sigma)*Valpha_cur 
-		    + ((IM_Struct->Ts*R_R)/(L_sigma*L_M))*psi_alpha_pre 
+    Ialpha_cur = (1/A)*(Ialpha_pre + (IM_Struct->Ts/L_sigma)*Valpha_cur
+		   +((IM_Struct->Ts*R_R)/(L_sigma*L_M))*psi_alpha_pre 
 		    + (IM_Struct->Ts*Wr_pre/L_sigma)*psi_beta_pre);
 
     Ibeta_cur = (1/A)*(Ibeta_pre + (IM_Struct->Ts/L_sigma)*Vbeta_cur 
@@ -112,7 +112,7 @@ void IM_model(IM_Typedef *IM_Struct,float Valpha,float Vbeta,float TL,
 		    - (IM_Struct->Ts*Wr_pre)*psi_beta_pre);
 
     psi_beta_cur = (1/B)*(psi_beta_pre + (IM_Struct->Ts*R_R)*Ibeta_cur 
-		    - (IM_Struct->Ts*Wr_pre)*psi_alpha_cur);
+		   + (IM_Struct->Ts*Wr_pre)*psi_alpha_cur);
 
     // Developed electromagnetic torque
     Te_cur = (psi_alpha_cur*Ibeta_cur - psi_beta_cur*Ialpha_cur);

@@ -37,13 +37,13 @@
 #define NOMINAL_ROTOR_RESISTANCE	(float)1.03		// [Ohm]
 #define NOMINAL_LEAKAGE_INDUCTANCE	(float)0.0095		// [H]
 #define NOMINAL_MAGNETIZING_INDUCTANCE	(float)0.066		// [H]
-#define RISE_TIME_CC			(float)0.001		// [s]
+#define RISE_TIME_CC			(float)0.01            // [s]
 #define NOMINAL_INERTIA			(float)0.0192
 #define NOMINAL_DAMPING_CONST		(float)0.0024
-#define SAMPLING_TIME			(float)0.0314		// [p.u.]
+#define SAMPLING_TIME			(float)0.0001                   // [s]
 #define SAMPLING_TIME_SEC		(float)0.0001			// [s]
 #define SWITCHING_FREQUENCY		(float)(1/SAMPLING_TIME_SEC)	// [Hz]
-#define RESERVOIR_CONST			(float)0.95
+#define RESERVOIR_CONST			(float)1
 #define TIME_OFFSET_FACTOR		(float)0.5
 
 // FIXME - fix this to be sensor input
@@ -53,8 +53,8 @@
 /*
  * Torque Load in pu
  */
-#define TORQUE_LOAD			(float)0.6489		// [p.u.]
-#define MOTOR_REF_SPEED			(float)0.9333		// [p.u.]
+#define TORQUE_LOAD			(float)0.6489           // [p.u.]
+#define MOTOR_REF_SPEED			(float)0.9333           // [p.u.]
 
 /*
  * Define D-Q Transformation flags
@@ -250,6 +250,7 @@ int control_loop()
 #endif
 
 	// Run Reference Generator
+
 	RG_Controller(&Reference_Generator, Vd_ref, Vq_ref, MOTOR_REF_SPEED,
 			W_r, &Id_ref, &Iq_ref, &W1, &Theta1);
 
@@ -259,11 +260,11 @@ int control_loop()
 
 
 	// Run D-axis control
-	PI_Controller(&PI_Control, Id_ref, Id, Iq, W1, &Vd_ref, D_AXIS_CONTROL);
+	PI_Controller(&PI_Control, Id_ref, Id, Iq, 1, &Vd_ref, D_AXIS_CONTROL);
 
 
 	// Run Q-axis control
-	PI_Controller(&PI_Control, Iq_ref, Iq, Id, W1, &Vq_ref, Q_AXIS_CONTROL);
+	PI_Controller(&PI_Control, Iq_ref, Iq, Id, 1, &Vq_ref, Q_AXIS_CONTROL);
 
 
 	// Run IDQ_transformation algorithm

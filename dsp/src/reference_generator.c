@@ -48,9 +48,9 @@ void RG_StructInit(RG_Typedef *RG_Struct,float BaseVolt,float ResCons,float Base
     	RG_Struct->Lsigma = LeakageInd;
     	RG_Struct->L_M = MagnetizingInd;
     	RG_Struct->Ts = Tsamp;
-    	RG_Struct->Kps_c = (SpdCtrlBwidth*InertiaConst)/(PolePair);
+    	RG_Struct->Kps_c = (SpdCtrlBwidth*InertiaConst)/(1.5*PolePair);
     	RG_Struct->Kis_c = RG_Struct->Kps_c*SpdCtrlBwidth;
-    	RG_Struct->ba_c = ((SpdCtrlBwidth*InertiaConst-DampingConst))/(PolePair) ;
+ 	RG_Struct->ba_c =(SpdCtrlBwidth*InertiaConst-DampingConst)/(PolePair) ;
     	RG_Struct->int_fw_pre = 0;
     	RG_Struct->psi_pre = 0;
     	RG_Struct->int_s_pre = 0;
@@ -87,35 +87,43 @@ void RG_Controller(RG_Typedef *RG_Struct,float Vd_ref,float Vq_ref,float Wr_ref,
     // Field weakening control is integral control
 
     // Compute error in square of the voltage
-    Verr = RG_Struct->Vbase*RG_Struct->Vbase*RG_Struct->K_reservoir*RG_Struct->K_reservoir 
-	    	- Vd_ref*Vd_ref - Vq_ref*Vq_ref;
 
-    // Compute w_max = max (w_base, w1)
-    if(RG_Struct->W1_pre >= RG_Struct->Wbase)
+    if (RG_Struct->W1_pre >= RG_Struct->Wbase)
+		    
     {
-        W_max = RG_Struct->W1_pre;
-    } else {
-        W_max = RG_Struct->Wbase;
+         
+    // Activate field weakening control
+ 
+     Verr = RG_Struct->Vbase*RG_Struct->Vbase*RG_Struct->K_reservoir*RG_Struct->K_reservoir 
+	                	- Vd_ref*Vd_ref - Vq_ref*Vq_ref;
+
+     W_max = RG_Struct->W1_pre;
+
+     Kfw_den = RG_Struct->Lsigma*RG_Struct->Lsigma*RG_Struct->Vbase*W_max;
+
+     K_fw = RG_Struct->Ts*RG_Struct->R_R/Kfw_den;
+
+     Id_cur = RG_Struct->int_fw_pre + K_fw*Verr;
+
+     if (Id_cur < RG_Struct->Imin)
+        {
+          Id_cur = RG_Struct->Imin;
+		    
+        }
+
+     if (Id_cur > RG_Struct-> Inom)
+        {
+	  Id_cur = RG_Struct->Inom;
+        }
+
+     *Id_ref = Id_cur;
+
+     }
+
+    else {
+	   *Id_ref = RG_Struct->Inom;
+
     }
-
-    // Integral gain of the field weakening control
-    Kfw_den = RG_Struct->Lsigma*RG_Struct->Lsigma*RG_Struct->Vbase*W_max;
-
-    K_fw = RG_Struct->Ts*RG_Struct->R_R/Kfw_den;
-
-    Id_cur = RG_Struct->int_fw_pre + K_fw*Verr;
-
-    if (Id_cur < RG_Struct->Imin)
-    {
-        Id_cur = RG_Struct->Imin;
-    }
-
-    if (Id_cur > RG_Struct->Inom)
-    {
-        Id_cur = RG_Struct->Inom;
-    }
-
-    *Id_ref = Id_cur;
 
     RG_Struct->int_fw_pre = *Id_ref;
 
@@ -128,11 +136,11 @@ void RG_Controller(RG_Typedef *RG_Struct,float Vd_ref,float Vq_ref,float Wr_ref,
 
 
     // Speed regulator proportional, integral and active resistance coefficients
-    kps = RG_Struct->Kps_c/psi_cur;
+    kps = RG_Struct->Kps_c/0.8659;          //psi_cur;
 
-    kis = RG_Struct->Kis_c/psi_cur;
+    kis = RG_Struct->Kis_c/0.8659;          //psi_cur;
 
-    ba = RG_Struct->ba_c/psi_cur;
+    ba = RG_Struct->ba_c/0.8659;
 
     // error in speed
     es = Wr_ref - Wr;
@@ -183,7 +191,7 @@ void RG_Controller(RG_Typedef *RG_Struct,float Vd_ref,float Vq_ref,float Wr_ref,
 
     if(*theta1 > 2*PI)
     {
-        *theta1 = 0;
+        *theta1 = *theta1 - 2*PI;
     }
 
     if (*theta1 < 0)
