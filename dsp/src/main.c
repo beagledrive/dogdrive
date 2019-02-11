@@ -7,6 +7,7 @@
 
 /* ================================== INCLUDES ============================== */
 
+// TODO - remove unnecessary includes already in custom header files
 #include <stdlib.h>
 #include <sys/time.h>
 #include <sys/stat.h>
@@ -26,7 +27,7 @@
 
 /*
  * Motor Parameters
- * Later with HMI, should be made customizable through interface
+ * TODO - Later with HMI, should be made customizable through interface
  */
 #define NOMINAL_PHASE_VOLTAGE		(float)127		// [Volta]
 #define NOMINAL_PHASE_CURRENT		(float)7.8		// [A]
@@ -69,24 +70,34 @@
 
 /*
  * Memory map GPIO-based interrupt signal from FPGA to internal memory of DSP
+ * See BBB documentation for details
  */
 #define GPIO_START_ADDR			0x4804C000
 #define GPIO_END_ADDR			0x4804DFFF
 #define GPIO_SIZE 			(GPIO_END_ADDR - GPIO_START_ADDR)
+#define GPIO_OE				0x134
 #define GPIO_DATAIN			0x138
+#define GPIO_DATAOUT			0x194
+#define GPIO_CLEARDATAOUT		0x190
 #define GPIO_PIN 			(1 << 17)		// PIN 17 on BB for interrupt
+#define GPIO_PIN_OUT			(1 << 28)
 
 /*
  * Register location of commands to FPGA
  */
-#define CONFIG_REG_L			(int)0
-#define CONFIG_REG_U			(int)1
-#define SW_ON_REG_L			(int)2
-#define SW_ON_REG_U			(int)3
-#define SW_OFF_REG_L			(int)4
-#define SW_OFF_REG_U			(int)5
+#define CONFIG_REG			(int)0
+#define SW_ON_REG			(int)2
+#define SW_OFF_REG			(int)3
 // Size of command register [uint16_t]
-#define COMMAND_REG_SIZE		(int)6
+#define COMMAND_REG_SIZE		(int)3
+
+/*
+ * PWM reset, enable and polarity commands
+ */
+#define PWM_RESET			(uint8_t)0b00000001
+#define PWM_ENABLE			(uint8_t)0b00000010
+#define PWM_POLARITY			(uint8_t)0b00000100
+#define PWM_DATA_VALID			(uint8_t)0b00001000
 
 
 /* ================================== TYPEDEFS ============================== */
@@ -138,7 +149,7 @@ static float Base_Ang_Freq = 0;
 
 /*
  * Alpha/Beta voltage and current parameters
- * Current load torque
+ * Current load torque - for debuggin with IM model only
  * Phase currents
  * Phase Voltages
  * Motor Speed
@@ -151,11 +162,11 @@ static float V_alpha = 0;
 static float V_beta = 0;
 
 #ifdef _DEBUG
-
+/* TODO - uncomment if using IM model
 static float I_alpha = 0;
 static float I_beta = 0;
 static float TM_cur = 0;
-
+*/
 #endif
 
 static float I_a = 0;
@@ -209,6 +220,10 @@ static SVPWM_Typedef SV_PWM;
  */
 static FILE* fd_csv;
 
+/*
+ * Debug variable used to limit CSV logging 
+ */
+static int data_count = 0;
 #endif
 
 /*
@@ -228,6 +243,17 @@ static uint32_t P3_fall;
  */
 volatile int man_interrupt = 0;
 
+/*
+ * Data valid global bit
+ * Alternating signal
+ */
+static uint8_t b_data_valid = 0;
+
+/*
+ * PWM reset signal to be sent once, then 
+ * set to 0
+ */
+static uint8_t b_pwm_reset = 1;
 
 /* ================================== FUNCTION DEFINITIONS ================== */
 
@@ -241,16 +267,15 @@ int control_loop()
 {
 	int b_error = 0;		// Error bit for possible future error handling
 
+
 #ifdef _DEBUG
-
+	// TODO - Currently disable, uncomment to test with IM model
 	// Simulate Induction Motor
-	IM_model(&Induction_Motor, V_alpha, V_beta, TORQUE_LOAD,
-			&I_a, &I_b, &I_c, &I_alpha, &I_beta, &TM_cur, &W_r);
-
+	/*IM_model(&Induction_Motor, V_alpha, V_beta, TORQUE_LOAD,
+			&I_a, &I_b, &I_c, &I_alpha, &I_beta, &TM_cur, &W_r);*/
 #endif
-
+	
 	// Run Reference Generator
-
 	RG_Controller(&Reference_Generator, Vd_ref, Vq_ref, MOTOR_REF_SPEED,
 			W_r, &Id_ref, &Iq_ref, &W1, &Theta1);
 
@@ -281,7 +306,7 @@ int control_loop()
 		fprintf(stderr, "Error with sending PWM timing data to FPGA\n");
 		b_error = 1;
 	}
-	
+
 	return b_error;
 }
 
@@ -290,32 +315,20 @@ int dsp_data_to_gpmc(const uint32_t P1_sw_on, const uint32_t P1_sw_off,
 			const uint32_t P2_sw_on, const uint32_t P2_sw_off,
 			const uint32_t P3_sw_on, const uint32_t P3_sw_off)
 {
+	// FIXME - Only one phase written, finish to accomodate all phase values,
+	// i.e. P2_sw_on/off, P3_sw_on/off
 	int b_error = 0;		// Error Bit
 	int i = 0;			// Increment loop variable
 
 	struct bridge br;		// Set up communication bridge
+	uint16_t setup_conf = 0;	// Config register for the FPGA
+	uint16_t P1_sw_on_t = 0;	// PWM switch on time
+	uint16_t P1_sw_off_t = 0;	// PWM switch off time
 
-	/*
-	 * Setup configuration command bits for FPGA
-	 * From LSB:
-	 * reset, enable, polarity,
-	 */
-	uint16_t setup_conf_L = 0b00000010;
-	uint16_t setup_conf_U = 0x0000;	
-
-	/*
-	 * Store switch on and switch off times
-	 */
-	uint16_t sw_on_UW = (uint16_t)(P1_sw_on >> 16);			// Phase 1 switch on at [ns] Upper
-	uint16_t sw_on_LW = (uint16_t)(P1_sw_on & 0x0000FFFF);		// Phase 1 switch on at [ns] Lower
-	uint16_t sw_off_UW = (uint16_t)(P1_sw_off >> 16);		// Phase 1 switch off at [ns] Upper
-	uint16_t sw_off_LW = (uint16_t)(P1_sw_off & 0x0000FFFF);	// Phase 1 switch off at [ns] Lower
-
-
-	// Command to be sent to the FPGA memory
-	uint16_t P1_data[] = {sw_on_LW, sw_on_UW, sw_off_LW, sw_off_UW, setup_conf_L, setup_conf_U};
-	// Map commands to FPGA register addresses
-	uint16_t reg_addr[] = {SW_ON_REG_L, SW_ON_REG_U, SW_OFF_REG_L, SW_OFF_REG_U, CONFIG_REG_L, CONFIG_REG_U};
+	// Command array sent to FPGA
+	uint16_t P1_data[COMMAND_REG_SIZE] = {P1_sw_on_t, P1_sw_off_t, setup_conf};
+	// Register address memory mapping
+	uint16_t reg_addr_map[COMMAND_REG_SIZE] = {SW_ON_REG, SW_OFF_REG, CONFIG_REG};
 
 	// Initialize communication bridge
 	if (bridge_init(&br, BW_BRIDGE_MEM_ADR, BW_BRIDGE_MEM_SIZE) < 0) 
@@ -323,13 +336,40 @@ int dsp_data_to_gpmc(const uint32_t P1_sw_on, const uint32_t P1_sw_off,
 		fprintf(stderr, "Unable to initialize communication bridge! \n");
 		b_error = 1;
 	}
-	
-	//fprintf(stdout, "-----%ui-----%ui\n", P1_sw_on, P1_sw_off);
+
+
+	// Set up PWM for transmitting
+	if (!b_error)
+	{
+		if (b_pwm_reset)
+		{
+			setup_conf |= PWM_RESET;
+			b_pwm_reset = 0;
+		}	
+		
+		setup_conf |= PWM_ENABLE;
+		setup_conf |= PWM_POLARITY;
+
+		if (b_data_valid)
+		{
+			setup_conf |= PWM_DATA_VALID;
+			b_data_valid = 0;
+		} else {
+			setup_conf &= 0xFFF7;
+			b_data_valid = 1;
+		}
+
+		// Convert switching times to 16 bit signals
+		P1_sw_on_t = (uint16_t)(P1_sw_on & 0x0000FFFF);
+		P1_sw_off_t = (uint16_t)(P1_sw_off & 0x0000FFFF);
+	}
+
+	// Transmit signal
 	if (!b_error)
 	{
 		while (i < COMMAND_REG_SIZE)
 		{
-			set_fpga_mem(&br, reg_addr[i]*sizeof(uint16_t), &P1_data[i], 1);
+			set_fpga_mem(&br, reg_addr_map[i]*sizeof(uint16_t), &P1_data[i], 1);
 			i++;
 		}
 	}
@@ -359,6 +399,8 @@ int main()
 	int log_freq = 0;
 	int log_counter_lim = 0;
 	int log_counter = 0;
+	clock_t start, end;
+	double cpu_time_used;
 
 	fprintf(stdout, "Would you like to log data output to csv file? (y/n)\n");
 
@@ -490,6 +532,9 @@ int main()
 		{
 			if ((*gpio_datain & GPIO_PIN) && !b_pin_latch)
 			{
+#ifdef _DEBUG
+				start = clock();
+#endif
 				b_pin_latch = 1;
 				if (control_loop())
 				{
@@ -498,15 +543,20 @@ int main()
 					break;
 				}
 #ifdef _DEBUG
+				end = clock();
+				cpu_time_used = ((double)(end-start)) / CLOCKS_PER_SEC;
 				if (b_log_enable) {
 					if (log_counter == log_counter_lim)
 					{
 						// Log output to DEBUG CSV
 						gettimeofday(&tv,NULL);
-						fprintf(fd_csv, "%f,%f,%f,%f,%f,%f,%f,%f,%ld,%ld,%f,%u,%u\n",V_alpha,V_beta,I_alpha,I_beta,W_r,TM_cur,
+						/*fprintf(fd_csv, "%f,%f,%f,%f,%f,%f,%f,%f,%ld,%ld,%f,%u,%u\n",V_alpha,V_beta,I_alpha,I_beta,W_r,TM_cur,
 								Induction_Motor.psi_a_pre,Induction_Motor.psi_b_pre, tv.tv_sec, tv.tv_usec,
-								V_a, P1_rise, P1_fall);
+								V_a, P1_rise, P1_fall);*/
+						fprintf(fd_csv, "%f, %ld, %ld\n", cpu_time_used, tv.tv_sec, tv.tv_usec);
 						log_counter = 0;
+						data_count++;
+						if(data_count == 200000) break;
 					}
 					log_counter++;
 				}

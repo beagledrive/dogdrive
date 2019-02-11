@@ -68,8 +68,6 @@ void SVPWM_Algorithm(SVPWM_Typedef *SVPWM_Struct,float Ua_ref,float Ub_ref,float
     // Computing maximum time
     Tmax = Tas;
 
-    // Fixing needed
-
     if(Tmax < Tbs)
     {
 	Tmax = Tbs;
@@ -96,8 +94,9 @@ void SVPWM_Algorithm(SVPWM_Typedef *SVPWM_Struct,float Ua_ref,float Ub_ref,float
     // Computing rising edge and falling edge of the PWM
     // FIXME - Handle unexpected error case when cal. times are negative
     // FIXME - Handle units
-    *Ta_rise = (uint32_t)(((SVPWM_Struct->Ts/2)-(Tga/2))*1000000000/5);
-    *Ta_fall = (uint32_t)(((SVPWM_Struct->Ts/2)+(Tga/2))*1000000000/5);
+    // FIXME - Current parameters used for testing, adjust to match desired speeds
+    *Ta_rise = (uint32_t)(((SVPWM_Struct->Ts/2)-(Tga/2))*1000000000/2);
+    *Ta_fall = (uint32_t)(((SVPWM_Struct->Ts/2)+(Tga/2))*1000000000/2);
 
     *Tb_rise = (uint32_t)((SVPWM_Struct->Ts/2)-(Tgb/2));
     *Tb_fall = (uint32_t)((SVPWM_Struct->Ts/2)+(Tgb/2));

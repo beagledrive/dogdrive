@@ -16,6 +16,9 @@
 
 /* ================================== FUNCTION PROTOTYPES =================== */
 
+/* 
+ * Function to convert from nominal values to p.u. base
+ */
 void Base_Compute(float NOMINAL_PHASE_VOLTAGE,float NOMINAL_PHASE_CURRENT,
 		  float POLE_PAIRS,float NOMINAL_STATOR_FREQUENCY,
                   float SV_SCALING_CONST, float NOMINAL_STATOR_RESISTANCE,
