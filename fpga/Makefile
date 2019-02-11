@@ -3,10 +3,10 @@ BUILD =./BUILD
 DEVICE = 8k
 FOOTPRNT = tq144:4k
 
-SRC += top.v
-SRC += gpmc-sync.v
-SRC += pwm.v
-PIN_SRC = pinmap.pcf
+SRC += ./src/top.v
+SRC += ./src/gpmc-sync.v
+SRC += ./src/pwm.v
+PIN_SRC = ./src/pinmap.pcf
 
 .PHONY: all load clean
 
