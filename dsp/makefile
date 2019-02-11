@@ -1,5 +1,6 @@
 #
 # Sample makefile to compile template files
+# TODO - move build objects to separate directory to remove clutter 
 
 TARGET = build
 # source directory

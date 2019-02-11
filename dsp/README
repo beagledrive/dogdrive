@@ -1,0 +1,12 @@
+Hello you poor unfortunate soul reading this!
+Custom built header files are in the "header" directory and all source files are under "src" (creative, I know).
+In order to compile and run the program, do the following:
+	- "make" in this directory will build the standard program
+	- "make CFG=debug" will compile a debig version with logging options and the IM model will
+		be included in the control loop (i.e. you don't need a motor)
+	- "make clean" will provide a clean slate and remove all build objects
+One compile, a target file is generated named "build", to run this program, you need to be a superuser:
+	- "sudo ./build", this is because the program needs to access the BBB memory directly
+	- If you built a debug version of the code, follow the command line instructions
+
+GL HF! As the kids would say...
