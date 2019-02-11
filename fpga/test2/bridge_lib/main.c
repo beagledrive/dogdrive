@@ -80,19 +80,19 @@ int write_dsp_data()
 		//src++;
 	}
 	
-/*	int regRetAddr [] = {4,5,6};
+	int regRetAddr [] = {4,5,6};
 	uint16_t retrieveData;
 	i = 0;
-//	printf("Data Read:----------------------------- \n");	
+	printf("Data Read:----------------------------- \n");	
 	while (i <  sizeof(data)/sizeof(uint16_t))
 	{
 		get_fpga_mem(&br, (uint16_t) regRetAddr[i]*sizeof(uint16_t), &retrieveData, 1);
-//		printf("Index: %X  Retrieved: 0x%X \n", regRetAddr[i], retrieveData);
+		printf("Index: %X  Retrieved: 0x%X \n", regRetAddr[i], retrieveData);
 		i++;
 	}
 	
-//	printf("--------------------------------------- \n");
-*/	b_error = 0;
+	printf("--------------------------------------- \n");
+	b_error = 0;
 	return b_error;
 }
 
